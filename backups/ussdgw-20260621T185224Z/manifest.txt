@@ -1,0 +1,5 @@
+timestamp=20260621T185224Z
+reason=before-setup-host
+BUILD_ID=20260621T184219-f7a1dce
+USSDGW_IMAGE=restcomm-ussd:7.2.1-SNAPSHOT-20260621T184219-f7a1dce
+archive=/home/meodien/Desktop/ethiopia-working-dir/ussdgw-test/backups/ussdgw-20260621T185224Z/ussdgw-host.tgz

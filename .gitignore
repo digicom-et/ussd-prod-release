@@ -1,0 +1,16 @@
+# Large binaries — do not commit to git
+docker/*.tar
+docker/*.tar.bak
+backups/ussdgw-*/ussdgw-host.tgz
+backups/*.tgz
+backups/*.tar.gz
+backups/*.tar
+backups/*.tar.bak
+tools/grpc-as-tester/.venv/
+.grpc-as.pid
+grpc-as.log
+tools/jss7-map-load/map-*.csv
+tools/jss7-map-load/maplog.txt
+**/__pycache__/
+*.pyc
+*.pyo

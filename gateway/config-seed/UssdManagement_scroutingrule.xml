@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<scroutingrulelist>
+  <ArrayList>
+    <item>
+      <ruleType>GRPC</ruleType>
+      <shortcode>*100#</shortcode>
+      <networkid>0</networkid>
+      <ruleurl>127.0.0.1:8443</ruleurl>
+      <exactmatch>true</exactmatch>
+    </item>
+    <item>
+      <ruleType>HTTP</ruleType>
+      <shortcode>*519#</shortcode>
+      <networkid>0</networkid>
+      <ruleurl>http://127.0.0.1:8049/</ruleurl>
+      <exactmatch>true</exactmatch>
+    </item>
+    <item>
+      <ruleType>SIP</ruleType>
+      <shortcode>*518#</shortcode>
+      <networkid>0</networkid>
+      <sipProxy>127.0.0.1:5080</sipProxy>
+      <exactmatch>true</exactmatch>
+    </item>
+  </ArrayList>
+</scroutingrulelist>

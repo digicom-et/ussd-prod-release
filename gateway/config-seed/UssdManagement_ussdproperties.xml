@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<HashMap>
+  <noroutingruleconfigerrmssg>Not valid short code. Please dial valid short code.</noroutingruleconfigerrmssg>
+  <serveroverloadedmsg>Server is overloaded. Please try later</serveroverloadedmsg>
+  <servererrmssg>Server error, please try again after sometime</servererrmssg>
+  <dialogtimeouterrmssg>Request timeout please try again after sometime.</dialogtimeouterrmssg>
+  <!-- 60s AS timeout headroom for 1000 TPS (must be &lt;= TCAP dialogTimeout) -->
+  <dialogtimeout>60000</dialogtimeout>
+  <ussdgt>923330053058</ussdgt>
+  <ussdssn>8</ussdssn>
+  <hlrssn>6</hlrssn>
+  <mscssn>8</mscssn>
+  <maxmapv>3</maxmapv>
+  <cdrloggingto>Textfile</cdrloggingto>
+  <cdrSeparator>:</cdrSeparator>
+  <!-- 1000 TPS @ ~10s avg session: concurrent MAP dialogs ~10k + headroom -->
+  <maxactivitycount>12000</maxactivitycount>
+  <sessionbridgeenabled>true</sessionbridgeenabled>
+  <asyncgatetimeoutms>7000</asyncgatetimeoutms>
+  <asyncwaitusermessage>He thong dang ban, se update lai cho ban ngay</asyncwaitusermessage>
+  <asynchardfailmessage>He thong dang co nhieu nguoi su dung, vui long dung lai sau</asynchardfailmessage>
+  <bridgestatettlsec>180</bridgestatettlsec>
+  <pushretrydelaysms>3000,8000,15000</pushretrydelaysms>
+</HashMap>

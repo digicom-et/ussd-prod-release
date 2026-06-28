@@ -1,0 +1,35 @@
+<?xml version='1.1' encoding='UTF-8'?>
+<TCAPConfig>
+  <dialogTimeout>120000</dialogTimeout>
+  <invokeTimeout>60000</invokeTimeout>
+  <maxDialogs>500000</maxDialogs>
+  <dialogIdRangeStart>1</dialogIdRangeStart>
+  <dialogIdRangeEnd>2147483647</dialogIdRangeEnd>
+  <ssn>8</ssn>
+  <previewMode>false</previewMode>
+  <doNotSendProtocolVersion>false</doNotSendProtocolVersion>
+  <congControl_blockingIncomingTcapMessages>false</congControl_blockingIncomingTcapMessages>
+  <congControl_ExecutorDelayThreshold>
+    <congControl_ExecutorDelayThreshold>1.0</congControl_ExecutorDelayThreshold>
+    <congControl_ExecutorDelayThreshold>6.0</congControl_ExecutorDelayThreshold>
+    <congControl_ExecutorDelayThreshold>12.0</congControl_ExecutorDelayThreshold>
+  </congControl_ExecutorDelayThreshold>
+  <congControl_ExecutorBackToNormalDelayThreshold>
+    <congControl_ExecutorBackToNormalDelayThreshold>0.5</congControl_ExecutorBackToNormalDelayThreshold>
+    <congControl_ExecutorBackToNormalDelayThreshold>3.0</congControl_ExecutorBackToNormalDelayThreshold>
+    <congControl_ExecutorBackToNormalDelayThreshold>8.0</congControl_ExecutorBackToNormalDelayThreshold>
+  </congControl_ExecutorBackToNormalDelayThreshold>
+  <congControl_MemoryThreshold>
+    <congControl_MemoryThreshold>77.0</congControl_MemoryThreshold>
+    <congControl_MemoryThreshold>87.0</congControl_MemoryThreshold>
+    <congControl_MemoryThreshold>97.0</congControl_MemoryThreshold>
+  </congControl_MemoryThreshold>
+  <congControl_BackToNormalMemoryThreshold>
+    <congControl_BackToNormalMemoryThreshold>72.0</congControl_BackToNormalMemoryThreshold>
+    <congControl_BackToNormalMemoryThreshold>82.0</congControl_BackToNormalMemoryThreshold>
+    <congControl_BackToNormalMemoryThreshold>92.0</congControl_BackToNormalMemoryThreshold>
+  </congControl_BackToNormalMemoryThreshold>
+  <statisticsEnabled>false</statisticsEnabled>
+  <slsRange>All</slsRange>
+  <isSwapTcapIdBytes>true</isSwapTcapIdBytes>
+</TCAPConfig>

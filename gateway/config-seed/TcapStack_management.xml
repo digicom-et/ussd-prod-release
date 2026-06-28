@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<TCAPConfig>
+  <!-- Must exceed USSD dialogtimeout (60000); sized for 1000 TPS lab/prod -->
+  <dialogTimeout>90000</dialogTimeout>
+  <invokeTimeout>45000</invokeTimeout>
+  <maxDialogs>15000</maxDialogs>
+  <dialogIdRangeStart>1</dialogIdRangeStart>
+  <dialogIdRangeEnd>2147483647</dialogIdRangeEnd>
+  <doNotSendProtocolVersion>false</doNotSendProtocolVersion>
+  <slsRange>All</slsRange>
+  <statisticsEnabled>false</statisticsEnabled>
+</TCAPConfig>

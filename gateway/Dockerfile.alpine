@@ -1,0 +1,111 @@
+# =============================================================================
+#  USSD Gateway — Alpine 3.19 multi-stage Dockerfile
+#  Replaces eclipse-temurin:8-jdk-jammy (~700 MB Ubuntu) with a slim Alpine +
+#  zulu-openjdk8 image (~280-320 MB total).
+#
+#  Tag produced:  restcomm-ussd-alpine:<USSD_VERSION>
+#  Build cmd  :   ./build-docker-alpine.sh
+# =============================================================================
+
+# ---- Stage 1: builder (only used to stage the unzipped tree) -----------------
+# We use the same base for both stages — no separate builder is needed because
+# the heavy payload is the unzipped USSD release zip (~330 MB) and we want it
+# in a single final layer. Keeping one stage also keeps the Dockerfile simple
+# and the image inspectable.
+FROM alpine:3.19
+
+# ---- Build-time args ---------------------------------------------------------
+ARG USSD_VERSION=7.3.1-SNAPSHOT
+
+# ---- Runtime env (same defaults as heavy Dockerfile) -------------------------
+ENV USSD_VERSION=${USSD_VERSION} \
+    JBOSS_HOME=/opt/restcomm/restcomm-ussd-${USSD_VERSION}/wildfly-10.0.0.Final \
+    USSDGW_HOST_BASE=/opt/ussdgw \
+    AUTO_JVM_ENABLED=true \
+    USSDGW_PROFILE=lab \
+    USER_CONFIG_JVM="" \
+    PATCH_FORCE=true \
+    PATCH_BACKUP=true \
+    LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8 \
+    JAVA_HOME=/usr/lib/jvm/default-jvm \
+    PATH=/usr/lib/jvm/default-jvm/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+# ---- System packages ---------------------------------------------------------
+#  openjdk8                — OpenJDK 8 (IcedTea build) from `community` repo.
+#                            Meta package pulls `openjdk8-jdk` (= full JDK with
+#                            javac/keytool/jdeps etc.) and the JRE base. The
+#                            `zulu-openjdk8` package mentioned in some guides
+#                            does NOT exist on Alpine 3.19 — only OpenJDK 8
+#                            does. Install prefix: /usr/lib/jvm/java-1.8-openjdk
+#                            Symlink (jrebase subpkg): /usr/lib/jvm/java-8-openjdk
+#  bash                    — entrypoint + compute-jvm.sh are bash scripts
+#  curl                    — healthcheck + ad-hoc ops
+#  ca-certificates         — HTTPS/TLS for curl, mgmt API, jSS7 stack
+#  tzdata                  — TZ env (TZ=Asia/Ho_Chi_Minh) needs zoneinfo
+#  lksctp-tools            — libsctp.so + userspace tools for SCTP (jSS7)
+#  inetutils-scripts       — `hostname -s` (used by docker-entrypoint.sh)
+#  nano, vim               — ops convenience (config edit inside container)
+#  procps                  — `ps`, `top` for ops
+#  iproute2                — `ss`, `ip` for ops
+#  unzip                   — unpack restcomm-ussd-*-linux.zip
+#  coreutils               — `tail`, `od`, etc. (GNU coreutils in Alpine)
+RUN apk add --no-cache \
+        openjdk8 \
+        bash \
+        curl \
+        ca-certificates \
+        tzdata \
+        lksctp-tools \
+        inetutils-scripts \
+        nano \
+        vim \
+        procps \
+        iproute2 \
+        unzip \
+        coreutils \
+    && ln -sf /usr/lib/jvm/java-1.8-openjdk /usr/lib/jvm/default-jvm \
+    && /usr/lib/jvm/default-jvm/bin/java -version 2>&1 | head -3
+
+# ---- Non-root user (same uid/gid as heavy Dockerfile for host fs compat) -----
+RUN addgroup -S -g 2000 ussdgw \
+ && adduser  -S -u 2000 -G ussdgw -h /opt/restcomm -s /sbin/nologin ussdgw
+
+# ---- Working dir & release payload ------------------------------------------
+WORKDIR /opt/restcomm
+
+# The zip is produced by ussdgateway/release-wildfly/build-docker.sh (step 1
+# runs `ant -f build-linux.xml clean release`) OR by `ant -f build-linux.xml
+# clean release` directly. It must be present at build context root.
+COPY restcomm-ussd-${USSD_VERSION}-linux.zip /tmp/
+RUN unzip -q /tmp/restcomm-ussd-${USSD_VERSION}-linux.zip -d /opt/restcomm \
+ && rm  /tmp/restcomm-ussd-${USSD_VERSION}-linux.zip \
+ && chmod +x ${JBOSS_HOME}/bin/*.sh \
+ && cp    ${JBOSS_HOME}/bin/standalone.conf ${JBOSS_HOME}/bin/standalone.conf.bundled \
+ && chown -R ussdgw:ussdgw /opt/restcomm
+
+# ---- Overlay files (standalone.conf, mgmt users, scripts, entrypoint) --------
+COPY standalone.conf                                                          ${JBOSS_HOME}/bin/standalone.conf
+COPY config-seed/configuration/mgmt-users.properties config-seed/configuration/mgmt-groups.properties ${JBOSS_HOME}/standalone/configuration/
+COPY scripts/                                                                /opt/restcomm/scripts/
+COPY docker-entrypoint.sh                                                     /opt/restcomm/docker-entrypoint.sh
+
+RUN chmod +x /opt/restcomm/docker-entrypoint.sh /opt/restcomm/scripts/*.sh \
+ && chown -R ussdgw:ussdgw /opt/restcomm/scripts \
+                       /opt/restcomm/docker-entrypoint.sh \
+                       ${JBOSS_HOME}/bin/standalone.conf
+
+# ---- Ports (same as heavy Dockerfile) ----------------------------------------
+EXPOSE 8080 8443 9990 9993 8009 2905 2906 8011 8012
+
+# ---- Healthcheck (same as heavy Dockerfile) ----------------------------------
+HEALTHCHECK --interval=30s --timeout=10s --start-period=300s --retries=10 \
+    CMD curl -fsS http://127.0.0.1:8080/jolokia/version \
+    || (curl -fsS -u admin:admin -H "Content-Type: application/json" \
+        -d '{"operation":"read-attribute","address":[],"name":"server-state"}' \
+        http://127.0.0.1:9990/management | grep -q running) \
+    || exit 1
+
+# ---- Entrypoint & CMD --------------------------------------------------------
+ENTRYPOINT ["/opt/restcomm/docker-entrypoint.sh"]
+CMD ["-b", "0.0.0.0", "-bmanagement", "0.0.0.0"]
