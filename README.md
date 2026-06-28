@@ -209,6 +209,40 @@ giải thích 2 container, yêu cầu `NET_RAW`).
 
 ---
 
+## 🏷️ Versioning
+
+Package dùng scheme **Hybrid SemVer + CalVer**: `<USSDGW_VERSION>+<BUILD_DATE>`
+
+| Field | Example | Mục đích |
+|---|---|---|
+| `USSDGW_VERSION` | `7.3.1` | SemVer core — ổn định, customer-facing, bump khi có feature/fix |
+| `BUILD_DATE` | `20260628` | CalVer — ngày build (UTC) |
+| `BUILD_ID` | `20260628T052817-3d3881a` | Full audit id (date + time + git short hash) |
+| `USSDGW_VERSION_FULL` | `7.3.1+20260628` | Combined (SemVer+CalVer) cho log/banner |
+
+**SemVer rules:**
+- `PATCH` (7.3.1 → 7.3.2): bugfix, không đụng config/API
+- `MINOR` (7.3.x → 7.4.0): feature mới backward-compat (thêm endpoint, thêm short code)
+- `MAJOR` (7.x → 8.0.0): breaking change (drop Wildfly, đổi port, đổi cấu trúc /opt/ussdgw)
+
+**Customer-facing Docker tag dùng SemVer** (`restcomm-ussd-alpine:7.3.1`) — stable qua nhiều rebuild.
+**Internal release-specific tag** dùng đầy đủ (`restcomm-ussd-alpine:7.3.1-20260628-3d3881a`) — phục vụ rollback và audit.
+
+Xem version hiện tại:
+```bash
+./scripts/version.sh              # one-line
+./scripts/version.sh --json       # machine-readable
+./scripts/version.sh --all        # verbose
+```
+
+Override trước khi build:
+```bash
+USSDGW_VERSION=7.4.0 ./scripts/build-package.sh
+echo "7.4.0" > VERSION              # hoặc sửa VERSION file
+```
+
+---
+
 ## Yêu cầu server
 
 Docker, JDK 8, Python 3.9+, SCTP (`lsmod | grep sctp`), RAM ≥ 6 GB.

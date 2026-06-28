@@ -56,7 +56,7 @@ services:
     command: ["/bin/sh", "/host-init.sh"]
 
   ussdgw:
-    image: ${USSDGW_IMAGE:-restcomm-ussd-alpine:7.3.1-SNAPSHOT}
+    image: ${USSDGW_IMAGE:-restcomm-ussd-alpine:7.3.1}
     container_name: ussd-prod
     hostname: ussd-prod
     depends_on:

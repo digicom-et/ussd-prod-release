@@ -11,7 +11,7 @@
 #       OR           ussdgateway/release-wildfly/build-linux.xml  via ant)
 #
 #  Env vars:
-#    USSD_VERSION   (default: 7.3.1-SNAPSHOT)
+#    USSD_VERSION   (default: 7.3.1)
 #    IMAGE_TAG      (default: $USSD_VERSION)  — explicit tag override
 #    SAVE_TAR       (default: 0)              — set to 1 to save
 #                                              docker/restcomm-ussd-alpine-<VER>.tar
@@ -23,7 +23,7 @@
 # =============================================================================
 set -euo pipefail
 
-VERSION="${USSD_VERSION:-7.3.1-SNAPSHOT}"
+VERSION="${USSD_VERSION:-7.3.1}"
 IMAGE_TAG="${IMAGE_TAG:-${VERSION}}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

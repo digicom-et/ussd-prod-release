@@ -1,7 +1,7 @@
 # USSD Gateway — Docker Compose
 
 The PROD release package ships a single gateway image (default
-`restcomm-ussd-alpine:7.3.1-SNAPSHOT`, an Alpine 3.19 + OpenJDK 8
+`restcomm-ussd-alpine:7.3.1`, an Alpine 3.19 + OpenJDK 8
 build that's ~280 MB instead of the heavy ~700 MB Ubuntu variant).
 
 The container runs as `network_mode: host` so the SCTP/MAP stack

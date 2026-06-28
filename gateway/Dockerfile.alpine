@@ -13,7 +13,7 @@
 FROM alpine:3.19
 
 # ---- Build-time args ---------------------------------------------------------
-ARG USSD_VERSION=7.3.1-SNAPSHOT
+ARG USSD_VERSION=7.3.1
 
 # ---- Runtime env (same defaults as heavy Dockerfile) -------------------------
 ENV USSD_VERSION=${USSD_VERSION} \

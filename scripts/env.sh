@@ -1,10 +1,18 @@
 #!/bin/bash
 # USSD Gateway PROD Release Package — common paths.
 #
+# Versioning scheme: Hybrid SemVer + CalVer
+#   USSDGW_VERSION  = SemVer core (e.g. 7.3.1, 7.4.0, 8.0.0)  — stable, customer-facing
+#   BUILD_DATE      = CalVer  (e.g. 20260628)                — build day
+#   BUILD_ID        = <BUILD_DATE>T<HHMMSS>-<gitshort7>       — full audit id
+#
+# USSD_VERSION is kept as an alias of USSDGW_VERSION for back-compat with older
+# scripts and the Wildfly ENTRYPOINT that still uses ${USSD_VERSION}.
+#
 # Supports TWO Docker image variants:
-#   - DOCKER_IMAGE / DOCKER_IMAGE_RELEASE   (heavy: eclipse-temurin Ubuntu)
+#   - DOCKER_IMAGE / DOCKER_IMAGE_RELEASE       (heavy: eclipse-temurin Ubuntu)
 #   - DOCKER_IMAGE_ALPINE / DOCKER_IMAGE_ALPINE_RELEASE
-#                                          (alpine:3.19 + zulu-openjdk8 slim)
+#                                              (alpine:3.19 + openjdk8 slim)
 #
 # USSDGW_IMAGE_VARIANT (default "alpine") controls which one is exported as
 # the canonical USSDGW_IMAGE for compose / start scripts.
@@ -17,38 +25,51 @@ export PKG_ROOT
 export GATEWAY_DIR="${PKG_ROOT}/gateway"
 export TOOLS_DIR="${PKG_ROOT}/tools"
 
-# Version from package (written by build-package.sh) or override USSD_VERSION=...
-USSD_VERSION="${USSD_VERSION:-7.3.1-SNAPSHOT}"
-if [ -f "${PKG_ROOT}/VERSION" ]; then
-    USSD_VERSION="$(tr -d '[:space:]' < "${PKG_ROOT}/VERSION")"
+# ── Version resolution (SemVer core from VERSION file) ──────────────────────
+# USSDGW_VERSION = SemVer core, e.g. 7.3.1, 8.0.0
+# Override before sourcing: USSDGW_VERSION=8.0.0 . ./scripts/env.sh
+USSDGW_VERSION="${USSDGW_VERSION:-}"
+if [ -z "${USSDGW_VERSION}" ] && [ -f "${PKG_ROOT}/VERSION" ]; then
+    USSDGW_VERSION="$(tr -d '[:space:]' < "${PKG_ROOT}/VERSION")"
 fi
+# Strip -SNAPSHOT / -rc1 / -alpha suffixes if present (legacy convention)
+USSDGW_VERSION="${USSDGW_VERSION%-SNAPSHOT}"
+USSDGW_VERSION="${USSDGW_VERSION%%-*}"   # also strips -rc1, -alpha, etc.
+# Default if VERSION file missing/empty
+USSDGW_VERSION="${USSDGW_VERSION:-7.3.1}"
 
-export USSD_VERSION
+export USSDGW_VERSION
+# Legacy alias — many existing scripts + Dockerfile ENTRYPOINT still use USSD_VERSION
+export USSD_VERSION="${USSD_VERSION:-${USSDGW_VERSION}}"
 
-# ---- Docker image defaults (heavy + alpine) ---------------------------------
-export DOCKER_IMAGE="restcomm-ussd:${USSD_VERSION}"
-export DOCKER_TAR="${PKG_ROOT}/docker/restcomm-ussd-${USSD_VERSION}.tar"
+# ── Docker image defaults (heavy + alpine) ──────────────────────────────────
+export DOCKER_IMAGE="restcomm-ussd:${USSDGW_VERSION}"
+export DOCKER_TAR="${PKG_ROOT}/docker/restcomm-ussd-${USSDGW_VERSION}.tar"
 
-export DOCKER_IMAGE_ALPINE="restcomm-ussd-alpine:${USSD_VERSION}"
-export DOCKER_TAR_ALPINE="${PKG_ROOT}/docker/restcomm-ussd-alpine-${USSD_VERSION}.tar"
+export DOCKER_IMAGE_ALPINE="restcomm-ussd-alpine:${USSDGW_VERSION}"
+export DOCKER_TAR_ALPINE="${PKG_ROOT}/docker/restcomm-ussd-alpine-${USSDGW_VERSION}.tar"
 
 export DOCKER_MANIFEST="${PKG_ROOT}/docker/package.manifest"
 export LOADED_IMAGE_STATE="${PKG_ROOT}/.loaded-image-release"
 
-# Release-specific image tag (unique per package build — avoids SNAPSHOT tag collision)
+# ── Release-specific metadata from manifest (optional) ──────────────────────
 if [ -f "${DOCKER_MANIFEST}" ]; then
     # shellcheck disable=SC1090
     source "${DOCKER_MANIFEST}"
 fi
 
+export BUILD_DATE="${BUILD_DATE:-unknown}"
 export BUILD_ID="${BUILD_ID:-legacy}"
 
-# Heavy-variant tag (default = the canonical :<VERSION> tag, not the release-tag)
+# Heavy-variant release-specific tag
 export DOCKER_IMAGE_RELEASE="${DOCKER_IMAGE_RELEASE:-${DOCKER_IMAGE}}"
 
-# Alpine-variant tag (default = the canonical :<VERSION> tag)
-export DOCKER_IMAGE_ALPINE="${DOCKER_IMAGE_ALPINE:-restcomm-ussd-alpine:${USSD_VERSION}}"
+# Alpine-variant release-specific tag
+export DOCKER_IMAGE_ALPINE="${DOCKER_IMAGE_ALPINE:-restcomm-ussd-alpine:${USSDGW_VERSION}}"
 export DOCKER_IMAGE_ALPINE_RELEASE="${DOCKER_IMAGE_ALPINE_RELEASE:-${DOCKER_IMAGE_ALPINE}}"
+
+# Combined customer-facing version string: 7.3.1+20260628
+export USSDGW_VERSION_FULL="${USSDGW_VERSION}+${BUILD_DATE}"
 
 # Active variant for this shell. Override before sourcing:
 #     USSDGW_IMAGE_VARIANT=heavy . ./scripts/env.sh
