@@ -1,0 +1,13 @@
+target
+**/target
+.git
+.gitignore
+**/.git
+**/.gitignore
+**/*.md
+**/.dockerignore
+**/Dockerfile
+**/docker-compose*.yml
+.dockerignore
+Dockerfile
+README.md

@@ -14,3 +14,13 @@ tools/jss7-map-load/maplog.txt
 **/__pycache__/
 *.pyc
 *.pyo
+
+# Rust build artifacts
+bpf-tps-monitor/*/target/
+bpf-tps-monitor/*/Cargo.lock
+
+# Compose backup files (legacy / standalone references kept on disk for history)
+*.bak
+docker-compose.*.bak
+gateway/docker-compose.*.bak
+bpf-tps-monitor/docker-compose.*.bak

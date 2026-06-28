@@ -4,7 +4,7 @@ source "$(dirname "$0")/env.sh"
 # shellcheck source=lib/host-backup.sh
 source "$(dirname "$0")/lib/host-backup.sh"
 
-echo "=== USSD GW Test Package — Preflight ==="
+echo "=== USSD GW PROD Release Package — Preflight ==="
 
 fail=0
 check() { if "$@"; then echo "  OK  $*"; else echo "  FAIL $*"; fail=1; fi }
@@ -76,5 +76,31 @@ else
 fi
 
 [ -d "${BACKUP_ROOT}" ] && echo "  OK  backups dir exists" || echo "  INFO backups created on first 01-load / 02-setup"
+
+# Master compose + monitor stack (BPF collector + TUI dashboard)
+if [ -f "${PKG_ROOT}/docker-compose.yml" ]; then
+    echo "  OK  master docker-compose.yml (gateway + collector + tui)"
+    if docker compose -f "${PKG_ROOT}/docker-compose.yml" config --quiet 2>/dev/null; then
+        echo "  OK  master compose parses cleanly"
+    else
+        echo "  FAIL master compose does not parse:"
+        docker compose -f "${PKG_ROOT}/docker-compose.yml" config 2>&1 | head -3
+        fail=1
+    fi
+else
+    echo "  FAIL missing master docker-compose.yml at ${PKG_ROOT}/"
+    fail=1
+fi
+
+# BPF TPS monitor — collector + TUI
+for app in collector tui; do
+    app_dir="${PKG_ROOT}/bpf-tps-monitor/${app}"
+    if [ -f "${app_dir}/Cargo.toml" ] && [ -f "${app_dir}/Dockerfile" ]; then
+        echo "  OK  bpf-tps-monitor/${app} (Rust crate + Dockerfile)"
+    else
+        echo "  FAIL missing bpf-tps-monitor/${app}/Cargo.toml or Dockerfile"
+        fail=1
+    fi
+done
 
 exit $fail

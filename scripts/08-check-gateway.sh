@@ -11,7 +11,8 @@ echo "=== Gateway health check: ${C} ==="
 
 if ! docker ps -a --format '{{.Names}}' | grep -qx "${C}"; then
     echo "FAIL: container '${C}' not found"
-    echo "  → cd gateway && docker compose up -d"
+    echo "  → ./scripts/03-start-gateway.sh"
+    echo "  → or:  docker compose -f docker-compose.yml up -d ussdgw"
     exit 1
 fi
 

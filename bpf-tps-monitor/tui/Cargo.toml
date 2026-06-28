@@ -1,0 +1,28 @@
+[package]
+name = "sctp-m3ua-tui"
+version = "0.1.0"
+edition = "2021"
+authors = ["USSD GW Telco Engineering"]
+description = "Live TPS dashboard for the SCTP/M3UA eBPF collector"
+
+[[bin]]
+name = "tui"
+path = "src/main.rs"
+
+[dependencies]
+ratatui = "0.27"
+crossterm = "0.28"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

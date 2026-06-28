@@ -55,12 +55,18 @@ sudo ./scripts/02-setup-host.sh
 ### Bước 5 — Start USSD Gateway (`docker compose up`) ⭐
 
 ```bash
-cd gateway
-docker compose up -d
+./scripts/03-start-gateway.sh                # gateway only
+./scripts/03-start-gateway.sh --with-monitor # gateway + BPF collector headless
 curl -fs http://localhost:8080/jolokia/version && echo " OK"
 ```
 
-Hoặc: `./scripts/03-start-gateway.sh`
+Hoặc dùng master compose trực tiếp:
+
+```bash
+cd ussdgw-prod-release          # đứng tại package root
+docker compose -f docker-compose.yml up -d ussdgw
+docker compose -f docker-compose.yml up -d collector   # optional — BPF TPS monitor
+```
 
 ### Bước 6–9
 
@@ -138,10 +144,6 @@ tar czf ussdgw-prod-release-7.3.0-SNAPSHOT.tar.gz -C .. ussdgw-prod-release
 
 Sau `build-package.sh`, kiểm tra `docker/package.manifest` (BUILD_ID) và `./scripts/00-preflight.sh`.
 
-## Yêu cầu server
-
-Docker, JDK 8, Python 3.9+, SCTP (`lsmod | grep sctp`), RAM ≥ 6 GB.
-
 ## Ports
 
 | Port | Dịch vụ |
@@ -149,6 +151,65 @@ Docker, JDK 8, Python 3.9+, SCTP (`lsmod | grep sctp`), RAM ≥ 6 GB.
 | 8012 | SCTP Gateway |
 | 8011 | MAP client |
 | 8443 | gRPC AS |
+| 8453 | gRPC Push (NI) |
 | 8049 | HTTP Pull AS |
 | 8080 | HTTP + Jolokia health (`/jolokia/version`) |
+| 9090 | **BPF collector metrics** (`/metrics`, `/healthz`) |
 | 9990 | WildFly management API |
+
+---
+
+## 📊 BPF/M3UA TPS Monitor + Live TUI Dashboard (mới)
+
+Toàn bộ stack chạy qua **một `docker-compose.yml` duy nhất** ở package root
+(`docker-compose.yml`) gồm 4 service: `init`, `ussdgw`, `collector`, `tui`.
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│ Master compose (docker-compose.yml)                                │
+│                                                                     │
+│  init (alpine, one-shot) → seed /opt/ussdgw                         │
+│           ↓                                                         │
+│  ussdgw (network_mode: host, alpine+openjdk8, Wildfly 10)          │
+│           │                                                         │
+│  collector (Rust, AF_PACKET SCTP/M3UA, host net, NET_RAW)          │
+│           ↓  HTTP /metrics @ :9090                                  │
+│  tui (Rust ratatui/crossterm, host net, TTY-attached)              │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**TUI tự động hiện lên console** khi bạn chạy:
+
+```bash
+# Cách 1 — toàn bộ stack foreground, TUI auto-attach cuối terminal:
+docker compose -f docker-compose.yml up
+
+# Cách 2 — gateway + collector daemon, TUI foreground:
+docker compose -f docker-compose.yml up -d ussdgw collector
+docker compose -f docker-compose.yml up tui
+
+# Cách 3 — dùng script:
+./scripts/03-start-gateway.sh --with-monitor
+./scripts/03-start-gateway.sh --tui-only       # attach TUI
+```
+
+Dashboard **render trong chỗ (in-place), KHÔNG cuộn dòng** vì dùng
+crossterm alternate-screen + ratatui dirty-cell redraw.
+
+Trong khi TUI đang chạy:
+- `q` / `Esc` — thoát
+- `p` — pause/resume polling
+- `r` — reset history (60s sparkline)
+
+Tách khỏi TUI mà không giết container: `Ctrl-p Ctrl-q`
+Attach lại: `docker attach sctp-m3ua-tui`
+
+Xem chi tiết ở `bpf-tps-monitor/README.md` (collector `/metrics` JSON schema,
+giải thích 2 container, yêu cầu `NET_RAW`).
+
+---
+
+## Yêu cầu server
+
+Docker, JDK 8, Python 3.9+, SCTP (`lsmod | grep sctp`), RAM ≥ 6 GB.
+BPF collector/TUI cần thêm `NET_RAW` capability (đã có sẵn trong compose).

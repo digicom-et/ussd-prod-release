@@ -109,9 +109,9 @@ load_image_tar() {
 }
 
 stop_gateway_stack() {
-    if [ -f "${GATEWAY_DIR}/docker-compose.yml" ]; then
+    if [ -f "${PKG_ROOT}/docker-compose.yml" ]; then
         echo "Stopping gateway stack (docker compose down)..."
-        (cd "${GATEWAY_DIR}" && docker compose down --remove-orphans) || true
+        (cd "${PKG_ROOT}" && docker compose -f "${PKG_ROOT}/docker-compose.yml" down --remove-orphans) || true
     fi
     for c in "${USSDGW_CONTAINER}" "${USSDGW_INIT_CONTAINER}" \
              ussdgw ussdgw-init ussdgw-prod-release ussdgw-prod-release-init; do

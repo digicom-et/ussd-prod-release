@@ -88,9 +88,9 @@ fi
 
 backup_host_ussdgw "before-gateway-switch"
 
-cd "${GATEWAY_DIR}"
-docker compose down --remove-orphans
-docker compose up -d --force-recreate
+cd "${PKG_ROOT}"
+docker compose -f "${PKG_ROOT}/docker-compose.yml" down --remove-orphans
+docker compose -f "${PKG_ROOT}/docker-compose.yml" up -d --force-recreate ussdgw
 
 record_image_switch "${FROM_IMAGE}" "${USSDGW_IMAGE}"
 

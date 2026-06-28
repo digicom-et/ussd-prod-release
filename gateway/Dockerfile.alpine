@@ -1,17 +1,15 @@
 # =============================================================================
-#  USSD Gateway — Alpine 3.19 multi-stage Dockerfile
+#  USSD Gateway — Alpine 3.19 single-stage Dockerfile
 #  Replaces eclipse-temurin:8-jdk-jammy (~700 MB Ubuntu) with a slim Alpine +
-#  zulu-openjdk8 image (~280-320 MB total).
+#  OpenJDK 8 image (~280-320 MB total).
 #
 #  Tag produced:  restcomm-ussd-alpine:<USSD_VERSION>
 #  Build cmd  :   ./build-docker-alpine.sh
+#
+#  Why single-stage: the heavy payload is the unzipped USSD release zip
+#  (~330 MB). No separate builder is needed, and keeping a single stage
+#  keeps the image inspectable.
 # =============================================================================
-
-# ---- Stage 1: builder (only used to stage the unzipped tree) -----------------
-# We use the same base for both stages — no separate builder is needed because
-# the heavy payload is the unzipped USSD release zip (~330 MB) and we want it
-# in a single final layer. Keeping one stage also keeps the Dockerfile simple
-# and the image inspectable.
 FROM alpine:3.19
 
 # ---- Build-time args ---------------------------------------------------------
@@ -39,6 +37,10 @@ ENV USSD_VERSION=${USSD_VERSION} \
 #                            does NOT exist on Alpine 3.19 — only OpenJDK 8
 #                            does. Install prefix: /usr/lib/jvm/java-1.8-openjdk
 #                            Symlink (jrebase subpkg): /usr/lib/jvm/java-8-openjdk
+#  su-exec                 — Alpine equivalent of `gosu` (Alpine has NO `gosu`
+#                            package). docker-entrypoint.sh uses `gosu ussdgw ...`,
+#                            so we install a `/usr/local/bin/gosu` symlink to
+#                            `su-exec` so the existing entrypoint works unchanged.
 #  bash                    — entrypoint + compute-jvm.sh are bash scripts
 #  curl                    — healthcheck + ad-hoc ops
 #  ca-certificates         — HTTPS/TLS for curl, mgmt API, jSS7 stack
@@ -52,6 +54,7 @@ ENV USSD_VERSION=${USSD_VERSION} \
 #  coreutils               — `tail`, `od`, etc. (GNU coreutils in Alpine)
 RUN apk add --no-cache \
         openjdk8 \
+        su-exec \
         bash \
         curl \
         ca-certificates \
@@ -65,7 +68,9 @@ RUN apk add --no-cache \
         unzip \
         coreutils \
     && ln -sf /usr/lib/jvm/java-1.8-openjdk /usr/lib/jvm/default-jvm \
-    && /usr/lib/jvm/default-jvm/bin/java -version 2>&1 | head -3
+    && ln -sf /sbin/su-exec /usr/local/bin/gosu \
+    && /usr/lib/jvm/default-jvm/bin/java -version 2>&1 | head -3 \
+    && gosu nobody true && echo "gosu shim -> su-exec OK"
 
 # ---- Non-root user (same uid/gid as heavy Dockerfile for host fs compat) -----
 RUN addgroup -S -g 2000 ussdgw \

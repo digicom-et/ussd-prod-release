@@ -5,7 +5,7 @@
 #   - "heavy"   (default historically) → eclipse-temurin:8-jdk-jammy Ubuntu base
 #                                          tag:   restcomm-ussd:<VERSION>
 #                                          tar:   docker/restcomm-ussd-<VERSION>.tar
-#   - "alpine"                          → alpine:3.19 + zulu-openjdk8 (slim)
+#   - "alpine"                          → alpine:3.19 + openjdk8 (IcedTea build, slim)
 #                                          tag:   restcomm-ussd-alpine:<VERSION>
 #                                          tar:   docker/restcomm-ussd-alpine-<VERSION>.tar
 #
@@ -151,7 +151,7 @@ BUILD_ID=${BUILD_ID}
 DOCKER_IMAGE=restcomm-ussd:${VERSION}
 DOCKER_IMAGE_RELEASE=${ACTIVE_HEAVY_REL}
 DOCKER_TAR=${HEAVY_TAR##*/}
-# Alpine variant (alpine:3.19 + zulu-openjdk8 — slim)
+# Alpine variant (alpine:3.19 + openjdk8 IcedTea — slim)
 DOCKER_IMAGE_ALPINE=restcomm-ussd-alpine:${VERSION}
 DOCKER_IMAGE_ALPINE_RELEASE=${ACTIVE_ALPINE_REL}
 DOCKER_TAR_ALPINE=${ALPINE_TAR##*/}

@@ -1,9 +1,12 @@
 # USSD Gateway — Docker Compose
 
-The prod release package ships a single gateway image (`restcomm-ussd:7.3.1-SNAPSHOT`)
-that runs as a `network_mode: host` container so the SCTP/MAP stack
+The PROD release package ships a single gateway image (default
+`restcomm-ussd-alpine:7.3.1-SNAPSHOT`, an Alpine 3.19 + OpenJDK 8
+build that's ~280 MB instead of the heavy ~700 MB Ubuntu variant).
+
+The container runs as `network_mode: host` so the SCTP/MAP stack
 binds directly to the host IP. The init service seeds
-`/opt/ussdgw/{data,log,configuration}` with the release config before the
+`/opt/ussdgw/{data,log,configuration}` with the prod config before the
 gateway boots.
 
 > **Note:** the production image is still based on the Wildfly 10
@@ -13,27 +16,47 @@ gateway boots.
 > documented below so that when the image moves off Wildfly, the
 > switch is a pure config-file rename.
 
+## Image variants
+
+| Variant | Tag | Base image | Approx size |
+|---------|-----|------------|-------------|
+| **alpine** (default) | `restcomm-ussd-alpine:<VERSION>` | `alpine:3.19` + `openjdk8` | ~280 MB |
+| heavy                 | `restcomm-ussd:<VERSION>`       | `eclipse-temurin:8-jdk-jammy` (Ubuntu) | ~700 MB |
+
+Switch via env (or override in `scripts/env.sh`):
+```bash
+USSDGW_IMAGE_VARIANT=heavy  . scripts/env.sh    # Ubuntu-based
+USSDGW_IMAGE_VARIANT=alpine . scripts/env.sh    # Alpine-based (default)
+```
+
+The Alpine variant is built by `gateway/build-docker-alpine.sh` using
+`gateway/Dockerfile.alpine`.
+
 ## Quick start
+
+The gateway lives in a **master `docker-compose.yml` at the package
+root** (the old `gateway/docker-compose.yml` was kept only as a
+`.legacy.bak` for historical reference).
 
 ```bash
 # From the package root (image loaded, host dirs created)
 cd /opt/ussdgw-prod-release
-./scripts/03-start-gateway.sh            # docker compose up -d
+./scripts/03-start-gateway.sh                    # gateway only
+./scripts/03-start-gateway.sh --with-monitor     # + BPF collector (headless)
+./scripts/03-start-gateway.sh --tui-only         # foreground TUI dashboard
+
+# Or use the master compose directly:
+docker compose -f docker-compose.yml up -d ussdgw
+docker compose -f docker-compose.yml up tui       # foreground TUI
 
 # Verify
-./scripts/08-check-gateway.sh           # curl /jolokia/version, docker logs
-docker compose -f gateway/docker-compose.yml ps
+./scripts/08-check-gateway.sh                    # curl /jolokia/version, logs
+docker compose -f docker-compose.yml ps
 
 # Stop
-./scripts/04-stop-gateway.sh
-```
-
-Or run docker compose directly:
-
-```bash
-cd /opt/ussdgw-prod-release/gateway
-docker compose up -d
-docker compose logs -f ussd-prod
+./scripts/04-stop-gateway.sh                     # gateway only
+./scripts/04-stop-gateway.sh --all               # gateway + collector + tui
+./scripts/stop-all.sh                            # everything incl. AS scripts
 ```
 
 ## Configuration paths
