@@ -38,6 +38,15 @@ if [ "${ROLLBACK}" -eq 1 ]; then
         list_release_images
         exit 1
     fi
+    local prev_img
+    prev_img="$(grep '^USSDGW_IMAGE=' "${GATEWAY_ENV_PREV}" | cut -d= -f2-)"
+    if ! docker image inspect "${prev_img}" >/dev/null 2>&1; then
+        echo "FAIL: previous image not found on disk: ${prev_img}"
+        echo "  It may have been pruned. Available images:"
+        list_release_images
+        echo "  Use --to <tag> to switch to any available image."
+        exit 1
+    fi
     [ -f "${GATEWAY_DIR}/.env" ] && cp -f "${GATEWAY_DIR}/.env" "${GATEWAY_DIR}/.env.failed"
     cp -f "${GATEWAY_ENV_PREV}" "${GATEWAY_DIR}/.env"
     echo "Rollback → $(grep '^USSDGW_IMAGE=' "${GATEWAY_DIR}/.env" | cut -d= -f2-)"

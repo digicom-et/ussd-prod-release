@@ -1,4 +1,6 @@
-# Large binaries — do not commit to git
+# Large binaries — do not commit to git. Download separately or build locally.
+# Docker image tarballs (700–900 MB each) — download from artifact server:
+#   wget https://artifacts.digicom-et.com/ussdgw/docker/restcomm-ussd-alpine-7.3.1.tar
 docker/*.tar
 docker/*.tar.bak
 backups/ussdgw-*/ussdgw-host.tgz
@@ -17,7 +19,6 @@ tools/jss7-map-load/maplog.txt
 
 # Rust build artifacts
 bpf-tps-monitor/*/target/
-bpf-tps-monitor/*/Cargo.lock
 
 # Compose backup files (legacy / standalone references kept on disk for history)
 *.bak

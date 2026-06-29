@@ -34,6 +34,9 @@
 # Image variants:
 #   USSDGW_IMAGE_VARIANT=alpine  (default)  → restcomm-ussd-alpine:*
 #   USSDGW_IMAGE_VARIANT=heavy              → restcomm-ussd:*
+#
+# Override BPF collector interface (default: any):
+#   BPF_IFACE=eth0 docker compose up -d collector
 # =============================================================================
 
 name: ussdgw-prod-release
@@ -68,7 +71,9 @@ services:
     cap_add:
       - NET_ADMIN
       - NET_RAW
-    privileged: true
+      - SYS_ADMIN         # required for SCTP raw socket bind on some kernels
+    # privileged: true was removed for security — if SCTP fails, revert:
+    #   privileged: true
 
     ulimits:
       nofile:
@@ -134,7 +139,7 @@ services:
       - "--bind"
       - "0.0.0.0:9090"
       - "--iface"
-      - "eth0"
+      - "${BPF_IFACE:-any}"
       - "--gw-port"
       - "8012"
       - "--window-secs"

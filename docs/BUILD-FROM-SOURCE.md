@@ -140,8 +140,8 @@ cd ethiopia-working-dir/ussdgateway/release-wildfly
 
 # Cách 2: Thủ công (nếu đã chạy ant release)
 docker build \
-  --build-arg "USSD_VERSION=7.3.0-SNAPSHOT" \
-  -t "restcomm-ussd:7.3.0-SNAPSHOT" \
+  --build-arg "USSD_VERSION=7.3.1" \
+  -t "restcomm-ussd:7.3.1" \
   -t "restcomm-ussd:latest" \
   .
 
@@ -185,7 +185,7 @@ ant -f build-linux.xml clean release
 
 ```bash
 # Save image thành tar
-docker save restcomm-ussd:7.3.0-SNAPSHOT -o restcomm-ussd-7.3.0-SNAPSHOT.tar
+docker save restcomm-ussd:7.3.1 -o restcomm-ussd-7.3.1.tar
 
 # Copy lên server
 tar czfh - restcomm-ussd-7.3.0-SNAPSHOT.tar | ssh user@server "tar xzf - -C /opt/ussdgw/docker/"
@@ -205,7 +205,7 @@ cd ethiopia-working-dir/ussdgw-prod-release
 ./scripts/build-package.sh
 
 # Đóng gói
-tar czf ussdgw-prod-release-7.3.0-SNAPSHOT.tar.gz -C .. ussdgw-prod-release
+tar czf ussdgw-prod-release-7.3.1.tar.gz -C .. ussdgw-prod-release
 ```
 
 ### 5.2. Deploy lên server test

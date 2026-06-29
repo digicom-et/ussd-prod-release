@@ -78,7 +78,7 @@ Each step in this document has **two ways** to run:
 ```bash
 # Extract (if not yet done)
 cd /opt
-tar xzf ussdgw-prod-release-7.2.1-SNAPSHOT.tar.gz
+tar xzf ussdgw-prod-release-7.3.1.tar.gz
 cd ussdgw-prod-release
 ```
 

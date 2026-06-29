@@ -68,8 +68,14 @@ else
     echo "Skipping config-seed overwrite (--no-seed)"
 fi
 
-chown -R 2000:2000 "${HOST_USSDGW}/data" "${HOST_USSDGW}/log" 2>/dev/null || \
-    sudo chown -R 2000:2000 "${HOST_USSDGW}/data" "${HOST_USSDGW}/log"
+chown -R 2000:2000 "${HOST_USSDGW}/data" "${HOST_USSDGW}/log" 2>/dev/null || {
+    if command -v sudo >/dev/null 2>&1; then
+        sudo chown -R 2000:2000 "${HOST_USSDGW}/data" "${HOST_USSDGW}/log"
+    else
+        echo "FATAL: Cannot chown ${HOST_USSDGW}/data — run script with sudo"
+        exit 1
+    fi
+}
 
 check_sctp_module || true
 

@@ -10,7 +10,7 @@ Giải nén → chạy script → verify. **Không cần build.**
 
 ```bash
 cd /opt
-tar xzf ussdgw-prod-release-7.3.0-SNAPSHOT.tar.gz
+tar xzf ussdgw-prod-release-7.3.1.tar.gz
 cd ussdgw-prod-release
 ```
 
@@ -139,7 +139,7 @@ Tạo package mới (máy build):
 cd ussdgateway/release-wildfly && ./build-docker.sh
 docker context use default   # cùng context khi load/deploy
 cd ../../ussdgw-prod-release && ./scripts/build-package.sh
-tar czf ussdgw-prod-release-7.3.0-SNAPSHOT.tar.gz -C .. ussdgw-prod-release
+tar czf ussdgw-prod-release-7.3.1.tar.gz -C .. ussdgw-prod-release
 ```
 
 Sau `build-package.sh`, kiểm tra `docker/package.manifest` (BUILD_ID) và `./scripts/00-preflight.sh`.
@@ -219,6 +219,16 @@ Package dùng scheme **Hybrid SemVer + CalVer**: `<USSDGW_VERSION>+<BUILD_DATE>`
 | `BUILD_DATE` | `20260628` | CalVer — ngày build (UTC) |
 | `BUILD_ID` | `20260628T052817-3d3881a` | Full audit id (date + time + git short hash) |
 | `USSDGW_VERSION_FULL` | `7.3.1+20260628` | Combined (SemVer+CalVer) cho log/banner |
+
+**Download Docker image (not in git — too large ~700 MB):**
+
+```bash
+# From artifact server:
+wget https://artifacts.digicom-et.com/ussdgw/docker/restcomm-ussd-alpine-7.3.1.tar -P docker/
+
+# Or build from source:
+cd ../ussdgateway/release-wildfly && ./build-docker-alpine.sh
+```
 
 **SemVer rules:**
 - `PATCH` (7.3.1 → 7.3.2): bugfix, không đụng config/API

@@ -56,5 +56,6 @@ USER tui
 ENV TERM=xterm-256color \
     COLORTERM=truecolor
 
+# Default arguments — compose overrides these; kept as fallback for `docker run` usage.
 ENTRYPOINT ["/app/tui"]
-CMD ["--collector", "http://collector:9090"]
+CMD ["--collector", "http://127.0.0.1:9090"]

@@ -78,7 +78,7 @@ Mỗi bước trong tài liệu có **hai cách** chạy:
 ```bash
 # Giải nén (nếu chưa)
 cd /opt
-tar xzf ussdgw-prod-release-7.2.1-SNAPSHOT.tar.gz
+tar xzf ussdgw-prod-release-7.3.1.tar.gz
 cd ussdgw-prod-release
 ```
 

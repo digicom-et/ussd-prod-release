@@ -9,7 +9,10 @@
 # --prune --keep N: delete oldest images (default keep=5); never removes running/previous.
 # --no-backup: skip /opt/ussdgw tar backup.
 # --list-images: show installed release tags + switch history.
+#
+# Requires bash ≥ 4 (associative arrays used in prune_old_images).
 set -euo pipefail
+[ "${BASH_VERSINFO[0]}" -ge 4 ] || { echo "ERROR: bash >= 4 required (current: ${BASH_VERSION})"; exit 1; }
 source "$(dirname "$0")/env.sh"
 # shellcheck source=lib/host-backup.sh
 source "$(dirname "$0")/lib/host-backup.sh"

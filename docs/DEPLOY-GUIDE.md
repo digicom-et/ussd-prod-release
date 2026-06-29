@@ -10,7 +10,7 @@ cd ussdgateway/release-wildfly
 Script thực hiện:
 1. `mvn clean package` — rebuild SLEE AS7 modules (`jain-slee/.../container/build/as7`)
 2. `ant -f build-linux.xml clean release` — verify SLEE JARs (không chứa `Unresolved compilation`)
-3. `docker build` — tag `restcomm-ussd:7.2.1-SNAPSHOT`
+3. `docker build` — tag `restcomm-ussd:7.3.1`
 
 > **Không** dùng `docker build` trực tiếp nếu chưa chạy ant release — image có thể chứa SLEE extension JAR lỗi.
 
@@ -43,7 +43,7 @@ docker run -d \
   -v ussdgw-data:/opt/ussdgw/data \
   -v ussdgw-logs:/opt/ussdgw/log \
   --restart=unless-stopped \
-  restcomm-ussd:7.2.1-SNAPSHOT
+  restcomm-ussd:7.3.1
 ```
 
 ### Option B: Docker Compose (khuyến nghị)

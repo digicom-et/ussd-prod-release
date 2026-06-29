@@ -41,7 +41,11 @@ WS="$(cd "${PKG_ROOT}/.." && pwd)"
 GW="${WS}/ussdgateway/release-wildfly"
 JSS7="${WS}/jSS7"
 GRPC="${WS}/ussdgateway/tools/grpc-as-tester"
-VERSION="${USSD_VERSION:-7.3.1}"
+VERSION="${USSD_VERSION:-}"
+if [ -z "${VERSION}" ] && [ -f "${PKG_ROOT}/VERSION" ]; then
+    VERSION="$(tr -d '[:space:]' < "${PKG_ROOT}/VERSION")"
+fi
+VERSION="${VERSION:-7.3.1}"
 
 # Image-variant selection ---------------------------------------------------
 # Default = "alpine" (per project plan). "auto" picks whichever tarball already
