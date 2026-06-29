@@ -1,12 +1,12 @@
-# USSD Gateway — Gói prod release
+# USSD Gateway — የፕሮዳክሽን ልቀት ጥቅል (Prod Release Package)
 
-Giải nén → chạy script → verify. **Không cần build.**
+ይክፈቱ → ስክሪፕቱን ያስኪዱ → ያረጋግጡ። **መገንባት አያስፈልግም (build አያስፈልግም)።**
 
 ---
 
-## Chạy nhanh (copy-paste từng bước)
+## ፈጣን አፈፃፀም (ደረጃ በደረጃ ይቅዱና ይለጥፉ)
 
-### Bước 1 — Giải nén và vào thư mục
+### ደረጃ 1 — ይክፈቱና ወደ ማውጫው ይግቡ
 
 ```bash
 cd /opt
@@ -14,139 +14,143 @@ tar xzf ussdgw-prod-release-7.3.1.tar.gz
 cd ussdgw-prod-release
 ```
 
-### Bước 2 — SCTP + kiểm tra
+### ደረጃ 2 — SCTP + ማረጋገጫ
 
 ```bash
-lsmod | grep sctp          # phải thấy dòng sctp
-# nếu trống:
+lsmod | grep sctp          # የsctp መስመር መታየት አለበት
+# ባዶ ከሆነ:
 sudo modprobe sctp
 
 chmod +x scripts/*.sh
 ./scripts/00-preflight.sh
 ```
 
-### Bước 3 — Load image Docker (backup host, không dừng GW)
+
+### ደረጃ 3 — የDocker ምስል ይጫኑ (በመጠባበቂያ አስተናጋጅ ላይ፣ GW ሳይቆም)
 
 ```bash
 ./scripts/01-load-docker-image.sh
 ```
 
-→ Backup `/opt/ussdgw` (nếu có) vào `backups/`, load tar, **giữ image cũ** để rollback.
+→ `/opt/ussdgw`ን (ካለ) ወደ `backups/` ያስቀምጣል፣ tar ይጫናል፣ **ለመመለሻ (rollback) የቀድሞውን ምስል ያስቀምጣል**።
 
-### Bước 3b — Switch (nâng cấp) hoặc bỏ qua nếu cài mới
+### ደረጃ 3b — መቀየር (ማሻሻል) ወይም አዲስ ጭነት ከሆነ መተው
 
 ```bash
 ./scripts/03-switch-gateway.sh
 ```
 
-### Bước 3c — Rollback (nếu bản mới lỗi)
+### ደረጃ 3c — መመለሻ (Rollback) — አዲሱ ስሪት ብልሽት ካለው
 
 ```bash
 ./scripts/03-switch-gateway.sh --rollback
 sudo ./scripts/02-setup-host.sh --restore backups/ussdgw-<timestamp>/
 ```
 
-### Bước 4 — Setup host
+### ደረጃ 4 — አስተናጋጅ ማዋቀር (Setup host)
 
 ```bash
 sudo ./scripts/02-setup-host.sh
 ```
 
-### Bước 5 — Start USSD Gateway (`docker compose up`) ⭐
+
+### ደረጃ 5 — USSD Gateway ያስነሱ (`docker compose up`) ⭐
 
 ```bash
-./scripts/03-start-gateway.sh                # gateway only
-./scripts/03-start-gateway.sh --with-monitor # gateway + BPF collector headless
+./scripts/03-start-gateway.sh                # ጌትዌይ ብቻ
+./scripts/03-start-gateway.sh --with-monitor # ጌትዌይ + BPF ሰብሳቢ (collector) headless
 curl -fs http://localhost:8080/jolokia/version && echo " OK"
 ```
 
-Hoặc dùng master compose trực tiếp:
+ወይም ዋናውን compose በቀጥታ ይጠቀሙ:
 
 ```bash
-cd ussdgw-prod-release          # đứng tại package root
+cd ussdgw-prod-release          # ከጥቅሉ ሥር ማውጫ (package root) ላይ ይቁሙ
 docker compose -f docker-compose.yml up -d ussdgw
-docker compose -f docker-compose.yml up -d collector   # optional — BPF TPS monitor
+docker compose -f docker-compose.yml up -d collector   # አማራጭ — BPF TPS መቆጣጠሪያ
 ```
 
-### Bước 6–9
+### ደረጃ 6–9
 
-Xem `docs/e2e-grpc-ussd-test.md` — mỗi bước có **script** và **「Thay thế thủ công」** (lệnh từng công cụ).
+`docs/e2e-grpc-ussd-test.md` ይመልከቱ — ለእያንዳንዱ ደረጃ **ስክሪፕት** እና **「በእጅ መተካት」** (ለእያንዳንዱ መሣሪያ የተለየ ትዕዛዝ) አለው።
 
-| Bước | Script nhanh | Tool thủ công |
+| ደረጃ | ፈጣን ስክሪፕት | በእጅ መሣሪያ |
 |------|--------------|---------------|
 | 6 gRPC AS | `05-start-grpc-as.sh` | `ussd_as_server.py :8443` |
 | 7 MAP smoke | `06-run-map-smoke.sh` | `java ... Client ... "*100#" BALANCE` |
 | 8 gRPC load | `07-run-grpc-smoke.sh` | `loadtest_client.py` |
 | 8b gRPC Push | `14-run-grpc-push-smoke.sh` | `grpc_push_client.py :8453` |
-| 9 Dừng | `stop-all.sh` | `compose down` + kill AS PID |
+| 9 ማቆም | `stop-all.sh` | `compose down` + kill AS PID |
 
-Gộp cài mới: `sudo ./scripts/start-all.sh`
+አዲስ ጭነትን በአንድ ላይ: `sudo ./scripts/start-all.sh`
 
-Bảng lệnh đầy đủ: [Phụ lục A](docs/e2e-grpc-ussd-test.md#phụ-lục-a--chạy-thủ-công-từng-công-cụ-thay-thế-script).
+የተሟላ የትዕዛዝ ሰንጠረዥ: [አባሪ A](docs/e2e-grpc-ussd-test.md#phụ-lục-a--chạy-thủ-công-từng-công-cụ-thay-thế-script)።
+
 
 ---
 
-## Backup & rollback
+## መጠባበቂያ እና መመለሻ (Backup & Rollback)
 
-| Thành phần | Lệnh |
+| አካል | ትዕዛዝ |
 |------------|------|
-| Backup host `/opt/ussdgw` | Tự động trong `01-load`, `03-switch`, `02-setup` |
-| Liệt kê backup | `./scripts/02-setup-host.sh --list-backups` |
-| Restore host | `sudo ./scripts/02-setup-host.sh --restore backups/ussdgw-*/` |
-| Image cũ trên disk | `docker images restcomm-ussd` |
-| Rollback image | `./scripts/03-switch-gateway.sh --rollback` |
-| Chọn image cụ thể | `./scripts/03-switch-gateway.sh --to <tag>` |
+| የአስተናጋጅ መጠባበቂያ `/opt/ussdgw` | በ`01-load`፣ `03-switch`፣ `02-setup` ውስጥ በራስ-ሰር ይከናወናል |
+| መጠባበቂያዎችን ይዘርዝሩ | `./scripts/02-setup-host.sh --list-backups` |
+| አስተናጋጅ መልሶ ማቋቋም | `sudo ./scripts/02-setup-host.sh --restore backups/ussdgw-*/` |
+| በዲስክ ላይ ያለ የቀድሞ ምስል | `docker images restcomm-ussd` |
+| ምስል መመለሻ | `./scripts/03-switch-gateway.sh --rollback` |
+| የተወሰነ ምስል ምረጡ | `./scripts/03-switch-gateway.sh --to <tag>` |
 
 ---
 
-## Hướng dẫn chi tiết
+## ዝርዝር መመሪያዎች
 
-| File | Nội dung |
+| ፋይል | ይዘት |
 |------|----------|
-| `docs/e2e-grpc-ussd-test.md` | Hướng dẫn E2E (VI) |
-| `docs/e2e-grpc-ussd-test_en.md` | E2E guide (EN) |
-| `docs/DEPLOY-GUIDE.md` | Deploy Docker image (người dùng cuối) |
-| `docs/BUILD-FROM-SOURCE.md` | **Build Docker image từ source code (developer)** |
-| `tools/jss7-map-load/USSD-LOADTEST.md` | MAP load CLI — package dùng `lib/*` |
+| `docs/e2e-grpc-ussd-test.md` | የE2E መመሪያ (በቬትናምኛ - VI) |
+| `docs/e2e-grpc-ussd-test_en.md` | የE2E መመሪያ (በእንግሊዝኛ - EN) |
+| `docs/DEPLOY-GUIDE.md` | የDocker ምስል ማሰማራት (ለዋና ተጠቃሚ) |
+| `docs/BUILD-FROM-SOURCE.md` | **የDocker ምስል ከምንጭ ኮድ መገንባት (ለገንቢ - developer)** |
+| `tools/jss7-map-load/USSD-LOADTEST.md` | MAP load CLI — `lib/*`ን የሚጠቀም ጥቅል |
 
-Chạy `./scripts/00-preflight.sh` trước test — verify `map-load.jar`, Woodstox, docker tar.
+ከሙከራ በፊት `./scripts/00-preflight.sh` ያስኪዱ — `map-load.jar`፣ Woodstox፣ docker tar ያረጋግጣል።
+
 
 ---
 
-## Cấu trúc package
+## የጥቅሉ መዋቅር (Package Structure)
 
 ```
 ussdgw-prod-release/
-├── backups/              # ussdgw-host.tgz (tạo khi chạy 01/02/03)
-├── docker/               # image tar + package.manifest
+├── backups/              # ussdgw-host.tgz (01/02/03 ሲሰራ ይፈጠራል)
+├── docker/               # የምስል tar + package.manifest
 ├── gateway/              # compose + .env + config-seed + configuration/
 ├── tools/
 ├── docs/
 └── scripts/
 ```
 
-Host persistence (compose volumes):
+የአስተናጋጅ ቀጣይነት (compose volumes):
 
-| Host path | Container | Purpose |
+| የአስተናጋጅ ዱካ (Host path) | ኮንቴይነር | ዓላማ |
 |-----------|-----------|---------|
-| `/opt/ussdgw/data` | SS7/USSD XML | Stack + routing config |
+| `/opt/ussdgw/data` | SS7/USSD XML | የስታክ + ራውቲንግ ውቅር |
 | `/opt/ussdgw/log` | WildFly logs | server.log |
-| `/opt/ussdgw/configuration` | `standalone/configuration` | GUI auth (`mgmt-users.properties`) |
+| `/opt/ussdgw/configuration` | `standalone/configuration` | GUI ማረጋገጫ (`mgmt-users.properties`) |
 
-Tạo package mới (máy build):
+አዲስ ጥቅል መፍጠር (በግንባታ ማሽን ላይ):
 
 ```bash
 cd ussdgateway/release-wildfly && ./build-docker.sh
-docker context use default   # cùng context khi load/deploy
+docker context use default   # ሲጭኑ/ሲያሰማሩ ተመሳሳይ context ይጠቀሙ
 cd ../../ussdgw-prod-release && ./scripts/build-package.sh
 tar czf ussdgw-prod-release-7.3.1.tar.gz -C .. ussdgw-prod-release
 ```
 
-Sau `build-package.sh`, kiểm tra `docker/package.manifest` (BUILD_ID) và `./scripts/00-preflight.sh`.
+ከ`build-package.sh` በኋላ `docker/package.manifest` (BUILD_ID) እና `./scripts/00-preflight.sh` ያረጋግጡ።
 
-## Ports
+## ወደቦች (Ports)
 
-| Port | Dịch vụ |
+| ወደብ | አገልግሎት |
 |------|---------|
 | 8012 | SCTP Gateway |
 | 8011 | MAP client |
@@ -154,21 +158,21 @@ Sau `build-package.sh`, kiểm tra `docker/package.manifest` (BUILD_ID) và `./s
 | 8453 | gRPC Push (NI) |
 | 8049 | HTTP Pull AS |
 | 8080 | HTTP + Jolokia health (`/jolokia/version`) |
-| 9090 | **BPF collector metrics** (`/metrics`, `/healthz`) |
-| 9990 | WildFly management API |
+| 9090 | **BPF ሰብሳቢ መለኪያዎች (collector metrics)** (`/metrics`, `/healthz`) |
+| 9990 | WildFly አስተዳደር API |
 
 ---
 
-## 📊 BPF/M3UA TPS Monitor + Live TUI Dashboard (mới)
+## 📊 BPF/M3UA TPS መቆጣጠሪያ + Live TUI ዳሽቦርድ (አዲስ)
 
-Toàn bộ stack chạy qua **một `docker-compose.yml` duy nhất** ở package root
-(`docker-compose.yml`) gồm 4 service: `init`, `ussdgw`, `collector`, `tui`.
+ሙሉው ቁልል (stack) የሚሰራው በአንድ **ነጠላ `docker-compose.yml`** ሲሆን ከጥቅሉ ሥር ማውጫ (package root) ላይ ነው
+(`docker-compose.yml`) 4 አገልግሎቶችን ያካትታል: `init`፣ `ussdgw`፣ `collector`፣ `tui`።
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│ Master compose (docker-compose.yml)                                │
+│ ዋና compose (docker-compose.yml)                                    │
 │                                                                     │
-│  init (alpine, one-shot) → seed /opt/ussdgw                         │
+│  init (alpine, one-shot) → /opt/ussdgw ዘርቶ ያስቀምጣል               │
 │           ↓                                                         │
 │  ussdgw (network_mode: host, Zulu 8 JDK, Wildfly 10)          │
 │           │                                                         │
@@ -178,131 +182,132 @@ Toàn bộ stack chạy qua **một `docker-compose.yml` duy nhất** ở packag
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-**TUI tự động hiện lên console** khi bạn chạy:
+**TUI ሲያስኪዱ በራስ-ሰር በኮንሶል ላይ ይታያል:**
 
 ```bash
-# Cách 1 — toàn bộ stack foreground, TUI auto-attach cuối terminal:
+# መንገድ 1 — ሙሉ ቁልል ከፊት (foreground)፣ TUI በራስ-ሰር በተርሚናል መጨረሻ ላይ ይያያዛል:
 docker compose -f docker-compose.yml up
 
-# Cách 2 — gateway + collector daemon, TUI foreground:
+# መንገድ 2 — ጌትዌይ + ሰብሳቢ እንደ daemon፣ TUI ከፊት (foreground):
 docker compose -f docker-compose.yml up -d ussdgw collector
 docker compose -f docker-compose.yml up tui
 
-# Cách 3 — dùng script:
+# መንገድ 3 — ስክሪፕት ይጠቀሙ:
 ./scripts/03-start-gateway.sh --with-monitor
-./scripts/03-start-gateway.sh --tui-only       # attach TUI
+./scripts/03-start-gateway.sh --tui-only       # TUI ያያይዙ
 ```
 
-Dashboard **render trong chỗ (in-place), KHÔNG cuộn dòng** vì dùng
-crossterm alternate-screen + ratatui dirty-cell redraw.
+ዳሽቦርዱ **በቦታው ላይ ነው የሚቀረጸው (in-place)፣ መስመር አያሸብልልም** ምክንያቱም
+crossterm alternate-screen + ratatui dirty-cell redraw ይጠቀማል።
 
-Trong khi TUI đang chạy:
-- `q` / `Esc` — thoát
-- `p` — pause/resume polling
-- `r` — reset history (60s sparkline)
+TUI በሚሰራበት ጊዜ:
+- `q` / `Esc` — መውጫ
+- `p` — ለአፍታ ማቆም/መቀጠል (pause/resume polling)
+- `r` — ታሪክ ዳግም ማስጀመር (የ60ሰከንድ sparkline)
 
-Tách khỏi TUI mà không giết container: `Ctrl-p Ctrl-q`
-Attach lại: `docker attach sctp-m3ua-tui`
+TUIን ኮንቴይነሩን ሳይገድሉ ይለዩ: `Ctrl-p Ctrl-q`
+እንደገና ያያይዙ: `docker attach sctp-m3ua-tui`
 
-Xem chi tiết ở `bpf-tps-monitor/README.md` (collector `/metrics` JSON schema,
-giải thích 2 container, yêu cầu `NET_RAW`).
+ዝርዝሩን በ`bpf-tps-monitor/README.md` ይመልከቱ (የሰብሳቢ `/metrics` JSON ንድፍ፣
+የ2 ኮንቴይነሮች ማብራሪያ፣ የ`NET_RAW` መስፈርት)።
 
 ---
 
-## 🏷️ Versioning
+## 🏷️ የስሪት አያያዝ (Versioning)
 
-Package dùng scheme **Hybrid SemVer + CalVer**: `<USSDGW_VERSION>+<BUILD_DATE>`
+ጥቅሉ **Hybrid SemVer + CalVer** እቅድ ይጠቀማል: `<USSDGW_VERSION>+<BUILD_DATE>`
 
-| Field | Example | Mục đích |
+| መስክ | ምሳሌ | ዓላማ |
 |---|---|---|
-| `USSDGW_VERSION` | `7.3.1` | SemVer core — ổn định, customer-facing, bump khi có feature/fix |
-| `BUILD_DATE` | `20260628` | CalVer — ngày build (UTC) |
-| `BUILD_ID` | `20260628T052817-3d3881a` | Full audit id (date + time + git short hash) |
-| `USSDGW_VERSION_FULL` | `7.3.1+20260628` | Combined (SemVer+CalVer) cho log/banner |
+| `USSDGW_VERSION` | `7.3.1` | SemVer ዋና — የተረጋጋ፣ ለደንበኛ የሚቀርብ፣ ባህሪ/ጥገና ሲኖር ይጨምራል |
+| `BUILD_DATE` | `20260628` | CalVer — የተገነባበት ቀን (UTC) |
+| `BUILD_ID` | `20260628T052817-3d3881a` | ሙሉ ኦዲት መታወቂያ (ቀን + ሰዓት + git አጭር hash) |
+| `USSDGW_VERSION_FULL` | `7.3.1+20260628` | የተዋሀደ (SemVer+CalVer) ለምዝግብ ማስታወሻ/ባነር |
 
-**Download Docker image (not in git — too large ~700 MB):**
+**የDocker ምስል ያውርዱ (በgit ውስጥ የለም — በጣም ትልቅ ~700 MB):**
 
 ```bash
-# From artifact server:
+# ከአርቲፋክት አገልጋይ:
 wget https://artifacts.digicom-et.com/ussdgw/docker/restcomm-ussd-zulu-7.3.1.tar -P docker/
 
-# Or build from source:
+# ወይም ከምንጭ ኮድ ይገንቡ:
 cd ../ussdgateway/release-wildfly && ./build-docker-zulu.sh
 ```
 
-**SemVer rules:**
-- `PATCH` (7.3.1 → 7.3.2): bugfix, không đụng config/API
-- `MINOR` (7.3.x → 7.4.0): feature mới backward-compat (thêm endpoint, thêm short code)
-- `MAJOR` (7.x → 8.0.0): breaking change (drop Wildfly, đổi port, đổi cấu trúc /opt/ussdgw)
+**የSemVer ህጎች:**
+- `PATCH` (7.3.1 → 7.3.2): የሳንካ ጥገና፣ ውቅር/API አይነካም
+- `MINOR` (7.3.x → 7.4.0): አዲስ ባህሪ ወደኋላ ተኳዃኝ (backward-compat) — አዲስ endpoint መጨመር፣ አዲስ አጭር ኮድ መጨመር
+- `MAJOR` (7.x → 8.0.0): ሰበሪ ለውጥ (breaking change) — Wildfly መተው፣ ወደብ መቀየር፣ የ/opt/ussdgw መዋቅር መቀየር
 
-**Customer-facing Docker tag dùng SemVer** (`restcomm-ussd-zulu:7.3.1`) — stable qua nhiều rebuild.
-**Internal release-specific tag** dùng đầy đủ (`restcomm-ussd-zulu:7.3.1-20260628-3d3881a`) — phục vụ rollback và audit.
+**ለደንበኛ የሚቀርበው Docker መለያ SemVer ይጠቀማል** (`restcomm-ussd-zulu:7.3.1`) — በበርካታ ድጋሚ ግንባታዎች የተረጋጋ።
+**የውስጥ ልቀት-ተኮር መለያ** ሙሉውን ይጠቀማል (`restcomm-ussd-zulu:7.3.1-20260628-3d3881a`) — ለመመለሻ እና ኦዲት ያገለግላል።
 
-Xem version hiện tại:
+የአሁኑን ስሪት ይመልከቱ:
 ```bash
-./scripts/version.sh              # one-line
-./scripts/version.sh --json       # machine-readable
-./scripts/version.sh --all        # verbose
+./scripts/version.sh              # አንድ-መስመር
+./scripts/version.sh --json       # ማሽን-ተነባቢ
+./scripts/version.sh --all        # ዝርዝር
 ```
 
-Override trước khi build:
+ከመገንባቱ በፊት ይሻሩ:
 ```bash
 USSDGW_VERSION=7.4.0 ./scripts/build-package.sh
-echo "7.4.0" > VERSION              # hoặc sửa VERSION file
+echo "7.4.0" > VERSION              # ወይም የVERSION ፋይል ያርትዑ
 ```
 
 ---
 
-## 🛠️ Build từ source (developer)
+## 🛠️ ከምንጭ ኮድ መገንባት (Build from Source — ለገንቢ)
 
-Dùng `build-all.sh` để build toàn bộ pipeline từ GitHub:
+`build-all.sh`ን በመጠቀም ሙሉውን ፓይፕላይን ከGitHub ይገንቡ:
 
-### Yêu cầu
-- git, mvn, ant, podman/docker
-- Java 8 (Zulu) — cài qua `mise install java@zulu-8`
-- Khoảng 5 GB disk
+### መስፈርቶች
+- git፣ mvn፣ ant፣ podman/docker
+- Java 8 (Zulu) — በ`mise install java@zulu-8` ይጫኑ
+- በግምት 5 GB ዲስክ
 
 ### WildFly clean
-Tải `wildfly-10.0.0.Final.zip` từ:
+`wildfly-10.0.0.Final.zip` ከዚህ ያውርዱ:
 https://download.jboss.org/wildfly/10.0.0.Final/wildfly-10.0.0.Final.zip
-Giải nén, strip unused modules, lưu vào `resources/wildfly-10.0.0.Final-cleaned.zip`.
-Hoặc copy từ repo ussdgateway có sẵn:
+ይክፈቱ፣ ጥቅም የሌላቸውን ሞጁሎች ያስወግዱ፣ እንደ `resources/wildfly-10.0.0.Final-cleaned.zip` ያስቀምጡ።
+ወይም ካለው የussdgateway ማከማቻ ይቅዱ:
 ```bash
 cp ../ussdgateway/release-wildfly/wildfly-10.0.0.Final-cleaned.zip resources/
 ```
 
 ### Jolokia
-Script `build-all.sh` tự tải jolokia-war 1.7.2 từ Maven Central.
+የ`build-all.sh` ስክሪፕት jolokia-war 1.7.2 ከMaven Central በራስ-ሰር ያወርዳል።
 
-### Build
+### መገንባት
 ```bash
-# Build toàn bộ: clone + Maven + Ant + Docker
+# ሙሉ ግንባታ: clone + Maven + Ant + Docker
 ./build-all.sh
 
-# Skip clone (đã có code local)
+# Clone መተው (ኮድ በአካባቢው አለ)
 SKIP_CLONE=1 ./build-all.sh
 
-# Chỉ build Docker image (đã có zip)
+# የDocker ምስል ብቻ መገንባት (zip አስቀድሞ አለ)
 SKIP_CLONE=1 SKIP_MAVEN=1 ./build-all.sh
 
-# Build không tạo Docker image
+# የDocker ምስል ሳይፈጠር መገንባት
 SKIP_DOCKER=1 ./build-all.sh
 ```
 
-### Build order
-1. jain-slee (core SLEE framework)
-2. jSS7 (SS7 protocol stack)
+### የግንባታ ቅደም ተከተል
+1. jain-slee (ዋናው የSLEE ማዕቀፍ)
+2. jSS7 (የSS7 ፕሮቶኮል ቁልል)
 3. sip-servlets (SIP servlet)
 4. jain-slee.ss7 (SS7/MAP RA)
 5. jain-slee.sip (SIP RA)
 6. jain-slee-http-okhttp (HTTP RA)
-7. ussdgateway (USSD Gateway application)
+7. ussdgateway (የUSSD Gateway መተግበሪያ)
 8. Ant release → zip
-9. Docker image (Zulu 8 JDK)
+9. የDocker ምስል (Zulu 8 JDK)
 
 ---
 
-## Yêu cầu server
+## የአገልጋይ መስፈርቶች
 
-Docker, JDK 8, Python 3.9+, SCTP (`lsmod | grep sctp`), RAM ≥ 6 GB.
-BPF collector/TUI cần thêm `NET_RAW` capability (đã có sẵn trong compose).
+Docker፣ JDK 8፣ Python 3.9+፣ SCTP (`lsmod | grep sctp`)፣ RAM ≥ 6 GB።
+BPF ሰብሳቢ/TUI `NET_RAW` ችሎታ (capability) ያስፈልገዋል (በcompose ውስጥ አስቀድሞ ተካቷል)።
+
