@@ -102,6 +102,16 @@ step "Step 4: Build USSD distribution"
 USSDGW_RELEASE="${PROJECTS_DIR}/ussdgateway/release-wildfly"
 cp "${WILDFLY_ZIP}" "${USSDGW_RELEASE}/wildfly-10.0.0.Final-cleaned.zip"
 
+# Download jolokia.war if not in Maven cache
+step "Step 4a: Download jolokia.war"
+JOLOKIA_WAR="${HOME}/.m2/repository/org/jolokia/jolokia-war/1.7.2/jolokia-war-1.7.2.war"
+if [ -f "${JOLOKIA_WAR}" ]; then
+  info "jolokia.war found in Maven cache"
+else
+  info "Downloading jolokia-war 1.7.2..."
+  mvn dependency:get -Dartifact=org.jolokia:jolokia-war:1.7.2:war -q 2>&1 | tail -2
+fi
+
 # Pre-build SLEE AS7 + HTTP RA
 JAINSLEE_AS7="${PROJECTS_DIR}/jain-slee/jain-slee/container/build/as7"
 if [ -d "${JAINSLEE_AS7}" ]; then

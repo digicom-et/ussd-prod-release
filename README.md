@@ -253,6 +253,55 @@ echo "7.4.0" > VERSION              # hoặc sửa VERSION file
 
 ---
 
+## 🛠️ Build từ source (developer)
+
+Dùng `build-all.sh` để build toàn bộ pipeline từ GitHub:
+
+### Yêu cầu
+- git, mvn, ant, podman/docker
+- Java 8 (Zulu) — cài qua `mise install java@zulu-8`
+- Khoảng 5 GB disk
+
+### WildFly clean
+Tải `wildfly-10.0.0.Final.zip` từ:
+https://download.jboss.org/wildfly/10.0.0.Final/wildfly-10.0.0.Final.zip
+Giải nén, strip unused modules, lưu vào `resources/wildfly-10.0.0.Final-cleaned.zip`.
+Hoặc copy từ repo ussdgateway có sẵn:
+```bash
+cp ../ussdgateway/release-wildfly/wildfly-10.0.0.Final-cleaned.zip resources/
+```
+
+### Jolokia
+Script `build-all.sh` tự tải jolokia-war 1.7.2 từ Maven Central.
+
+### Build
+```bash
+# Build toàn bộ: clone + Maven + Ant + Docker
+./build-all.sh
+
+# Skip clone (đã có code local)
+SKIP_CLONE=1 ./build-all.sh
+
+# Chỉ build Docker image (đã có zip)
+SKIP_CLONE=1 SKIP_MAVEN=1 ./build-all.sh
+
+# Build không tạo Docker image
+SKIP_DOCKER=1 ./build-all.sh
+```
+
+### Build order
+1. jain-slee (core SLEE framework)
+2. jSS7 (SS7 protocol stack)
+3. sip-servlets (SIP servlet)
+4. jain-slee.ss7 (SS7/MAP RA)
+5. jain-slee.sip (SIP RA)
+6. jain-slee-http-okhttp (HTTP RA)
+7. ussdgateway (USSD Gateway application)
+8. Ant release → zip
+9. Docker image (Zulu 8 JDK)
+
+---
+
 ## Yêu cầu server
 
 Docker, JDK 8, Python 3.9+, SCTP (`lsmod | grep sctp`), RAM ≥ 6 GB.
