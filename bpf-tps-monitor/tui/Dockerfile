@@ -7,7 +7,7 @@
 # ============================================================
 # Stage 1 — builder
 # ============================================================
-FROM rust:1.78-alpine3.19 AS builder
+FROM rust:1.85-alpine3.21 AS builder
 
 ENV CARGO_TERM_COLOR=always \
     RUSTFLAGS="-C target-feature=+crt-static -C link-arg=-s"

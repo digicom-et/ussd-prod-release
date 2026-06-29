@@ -1,0 +1,90 @@
+# =============================================================================
+# USSD Gateway — BPF/M3UA TPS Monitor — collector + TUI
+#
+# Separate compose file for the BPF monitoring stack.
+# Run alongside docker-compose.yml (gateway).
+#
+# Usage:
+#   # Start headless collector only:
+#   docker compose -f docker-compose.bpf.yml up -d collector
+#
+#   # Start collector + TUI foreground:
+#   docker compose -f docker-compose.bpf.yml up -d collector
+#   docker compose -f docker-compose.bpf.yml up tui
+#
+#   # Override sniff interface:
+#   BPF_IFACE=eth0 docker compose -f docker-compose.bpf.yml up -d collector
+# =============================================================================
+
+name: ussdgw-bpf-monitor
+
+services:
+
+  # ===========================================================================
+  # 1. BPF collector — AF_PACKET SCTP/M3UA metrics over HTTP at :9090 (host)
+  # ===========================================================================
+  collector:
+    build:
+      context: ./bpf-tps-monitor/collector
+      dockerfile: Dockerfile
+    image: sctp-m3ua-collector:latest
+    container_name: sctp-m3ua-collector
+
+    network_mode: host    # sniff host SCTP traffic + expose :9090
+
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
+
+    restart: unless-stopped
+
+    command:
+      - "--bind"
+      - "0.0.0.0:9090"
+      - "--iface"
+      - "${BPF_IFACE:-any}"
+      - "--gw-port"
+      - "8012"
+      - "--window-secs"
+      - "1"
+
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:9090/healthz || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  # ===========================================================================
+  # 2. TUI dashboard — ratatui/crossterm, foreground, auto-attaches to YOUR
+  #    terminal on `docker compose up`. Uses crossterm alternate-screen.
+  # ===========================================================================
+  tui:
+    build:
+      context: ./bpf-tps-monitor/tui
+      dockerfile: Dockerfile
+    image: sctp-m3ua-tui:latest
+    container_name: sctp-m3ua-tui
+
+    network_mode: host
+
+    stdin_open: true
+    tty: true
+
+    depends_on:
+      collector:
+        condition: service_healthy
+
+    environment:
+      TERM: xterm-256color
+      COLORTERM: truecolor
+
+    command:
+      - "--collector"
+      - "http://127.0.0.1:9090"
+      - "--interval-ms"
+      - "1000"
+      - "--label"
+      - "ussdgw-prod"
+
+    restart: on-failure

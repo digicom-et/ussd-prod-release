@@ -1,42 +1,23 @@
 # =============================================================================
-# USSD Gateway — PROD Release — single-file Compose for the WHOLE stack.
+# USSD Gateway — PROD Release — single-file Compose for the USSD Gateway.
 #
-# Three services, one `docker compose up -d` (and one `docker attach`) gets you:
+# Two services:
 #
-#   1. ussdgw     — the USSD Gateway (WildFly 10 + jSS7) on host network so
+#   1. init       — one-shot Alpine container that seeds /opt/ussdgw on host
+#
+#   2. ussdgw     — the USSD Gateway (WildFly 10 + jSS7) on host network so
 #                  SCTP/MAP can bind 8011/8012 directly to the host IP.
 #                  Image variant is chosen by USSDGW_IMAGE_VARIANT
-#                  (alpine|heavy, default alpine).
+#                  (zulu|heavy, default zulu).
 #
-#   2. collector  — Rust AF_PACKET/BPF SCTP/M3UA packet sniffer. Headless,
-#                  exposes metrics over HTTP at :9090 on the HOST
-#                  (network_mode:host). Captures every SCTP DATA chunk that
-#                  crosses the GW port.
-#
-#   3. tui        — Rust ratatui/crossterm dashboard that polls the collector.
-#                  Foreground, TTY-allocated. Auto-attaches to YOUR terminal
-#                  on `docker compose up` — the dashboard appears in place
-#                  and redraws without scrolling (ratatui alternate screen +
-#                  dirty-cell rendering).
+# BPF collector + TUI have been moved to docker-compose.bpf.yml.
 #
 # Usage:
-#   # Start gateway + collector (headless) + TUI (auto on your terminal):
-#   docker compose up -d ussdgw collector
-#   docker compose up tui                # foreground, auto-attach TUI
-#   # ...or all-in-one (gateway + collector daemons, TUI in foreground):
-#   docker compose up                     # attaches the TUI service
-#
-#   # Or split:
-#   docker compose up -d ussdgw collector   # daemons
-#   docker attach sctp-m3ua-tui             # attach to TUI whenever you want
-#   # Ctrl-p Ctrl-q to detach without killing it
+#   docker compose up -d
 #
 # Image variants:
-#   USSDGW_IMAGE_VARIANT=alpine  (default)  → restcomm-ussd-alpine:*
-#   USSDGW_IMAGE_VARIANT=heavy              → restcomm-ussd:*
-#
-# Override BPF collector interface (default: any):
-#   BPF_IFACE=eth0 docker compose up -d collector
+#   USSDGW_IMAGE_VARIANT=zulu   (default)  → restcomm-ussd-zulu:*
+#   USSDGW_IMAGE_VARIANT=heavy             → restcomm-ussd:*
 # =============================================================================
 
 name: ussdgw-prod-release
@@ -59,7 +40,7 @@ services:
     command: ["/bin/sh", "/host-init.sh"]
 
   ussdgw:
-    image: ${USSDGW_IMAGE:-restcomm-ussd-alpine:7.3.1}
+    image: ${USSDGW_IMAGE:-restcomm-ussd-zulu:7.3.1}
     container_name: ussd-prod
     hostname: ussd-prod
     depends_on:
@@ -117,77 +98,3 @@ services:
             http://127.0.0.1:9990/management
             | grep -q running
       interval: 30s
-# ===========================================================================
-  # 2. BPF collector — AF_PACKET SCTP/M3UA metrics over HTTP at :9090 (host)
-  # ===========================================================================
-  collector:
-    build:
-      context: ./bpf-tps-monitor/collector
-      dockerfile: Dockerfile
-    image: sctp-m3ua-collector:latest
-    container_name: sctp-m3ua-collector
-
-    network_mode: host    # sniff host SCTP traffic + expose :9090
-
-    cap_add:
-      - NET_RAW
-      - NET_ADMIN
-
-    restart: unless-stopped
-
-    command:
-      - "--bind"
-      - "0.0.0.0:9090"
-      - "--iface"
-      - "${BPF_IFACE:-any}"
-      - "--gw-port"
-      - "8012"
-      - "--window-secs"
-      - "1"
-
-    healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:9090/healthz || exit 1"]
-      interval: 10s
-      timeout: 3s
-      retries: 5
-      start_period: 5s
-
-# ===========================================================================
-  # 3. TUI dashboard — ratatui/crossterm, foreground, auto-attaches to YOUR
-  #    terminal on `docker compose up`. Uses crossterm alternate-screen so the
-  #    dashboard renders in place without scrolling.
-  #
-  #    Uses network_mode: host so it can reach the collector over
-  #    127.0.0.1:9090 (same netns) AND so the TTY allocation works the same
-  #    way as a `docker run -it` invocation — no port mapping, no bridge
-  #    DNS, no surprises.
-  # ===========================================================================
-  tui:
-    build:
-      context: ./bpf-tps-monitor/tui
-      dockerfile: Dockerfile
-    image: sctp-m3ua-tui:latest
-    container_name: sctp-m3ua-tui
-
-    network_mode: host    # see comment above
-
-    stdin_open: true      # attach stdin so crossterm reads keys
-    tty: true             # allocate a PTY so raw mode + alt screen work
-
-    depends_on:
-      collector:
-        condition: service_healthy
-
-    environment:
-      TERM: xterm-256color
-      COLORTERM: truecolor
-
-    command:
-      - "--collector"
-      - "http://127.0.0.1:9090"
-      - "--interval-ms"
-      - "1000"
-      - "--label"
-      - "ussdgw-prod"
-
-    restart: on-failure   # foreground service; if it dies, restart it

@@ -11,10 +11,10 @@
 #
 # Supports TWO Docker image variants:
 #   - DOCKER_IMAGE / DOCKER_IMAGE_RELEASE       (heavy: eclipse-temurin Ubuntu)
-#   - DOCKER_IMAGE_ALPINE / DOCKER_IMAGE_ALPINE_RELEASE
-#                                              (alpine:3.19 + openjdk8 slim)
+#   - DOCKER_IMAGE_ZULU / DOCKER_IMAGE_ZULU_RELEASE
+#                                              (azul/zulu-openjdk:8 Ubuntu)
 #
-# USSDGW_IMAGE_VARIANT (default "alpine") controls which one is exported as
+# USSDGW_IMAGE_VARIANT (default "zulu") controls which one is exported as
 # the canonical USSDGW_IMAGE for compose / start scripts.
 set -euo pipefail
 
@@ -42,12 +42,12 @@ export USSDGW_VERSION
 # Legacy alias — many existing scripts + Dockerfile ENTRYPOINT still use USSD_VERSION
 export USSD_VERSION="${USSD_VERSION:-${USSDGW_VERSION}}"
 
-# ── Docker image defaults (heavy + alpine) ──────────────────────────────────
+# ── Docker image defaults (heavy + zulu) ──────────────────────────────────
 export DOCKER_IMAGE="restcomm-ussd:${USSDGW_VERSION}"
 export DOCKER_TAR="${PKG_ROOT}/docker/restcomm-ussd-${USSDGW_VERSION}.tar"
 
-export DOCKER_IMAGE_ALPINE="restcomm-ussd-alpine:${USSDGW_VERSION}"
-export DOCKER_TAR_ALPINE="${PKG_ROOT}/docker/restcomm-ussd-alpine-${USSDGW_VERSION}.tar"
+export DOCKER_IMAGE_ZULU="restcomm-ussd-zulu:${USSDGW_VERSION}"
+export DOCKER_TAR_ZULU="${PKG_ROOT}/docker/restcomm-ussd-zulu-${USSDGW_VERSION}.tar"
 
 export DOCKER_MANIFEST="${PKG_ROOT}/docker/package.manifest"
 export LOADED_IMAGE_STATE="${PKG_ROOT}/.loaded-image-release"
@@ -64,32 +64,32 @@ export BUILD_ID="${BUILD_ID:-legacy}"
 # Heavy-variant release-specific tag
 export DOCKER_IMAGE_RELEASE="${DOCKER_IMAGE_RELEASE:-${DOCKER_IMAGE}}"
 
-# Alpine-variant release-specific tag
-export DOCKER_IMAGE_ALPINE="${DOCKER_IMAGE_ALPINE:-restcomm-ussd-alpine:${USSDGW_VERSION}}"
-export DOCKER_IMAGE_ALPINE_RELEASE="${DOCKER_IMAGE_ALPINE_RELEASE:-${DOCKER_IMAGE_ALPINE}}"
+# Zulu-variant release-specific tag
+export DOCKER_IMAGE_ZULU="${DOCKER_IMAGE_ZULU:-restcomm-ussd-zulu:${USSDGW_VERSION}}"
+export DOCKER_IMAGE_ZULU_RELEASE="${DOCKER_IMAGE_ZULU_RELEASE:-${DOCKER_IMAGE_ZULU}}"
 
 # Combined customer-facing version string: 7.3.1+20260628
 export USSDGW_VERSION_FULL="${USSDGW_VERSION}+${BUILD_DATE}"
 
 # Active variant for this shell. Override before sourcing:
 #     USSDGW_IMAGE_VARIANT=heavy . ./scripts/env.sh
-USSDGW_IMAGE_VARIANT="${USSDGW_IMAGE_VARIANT:-alpine}"
+USSDGW_IMAGE_VARIANT="${USSDGW_IMAGE_VARIANT:-zulu}"
 case "${USSDGW_IMAGE_VARIANT}" in
     heavy)  USSDGW_IMAGE_DEFAULT="${DOCKER_IMAGE_RELEASE}" ;;
-    alpine) USSDGW_IMAGE_DEFAULT="${DOCKER_IMAGE_ALPINE_RELEASE}" ;;
+    zulu)   USSDGW_IMAGE_DEFAULT="${DOCKER_IMAGE_ZULU_RELEASE}" ;;
     auto)
-        # Auto: prefer alpine if its tarball exists, else heavy
-        if [ -f "${DOCKER_TAR_ALPINE}" ]; then
-            USSDGW_IMAGE_DEFAULT="${DOCKER_IMAGE_ALPINE_RELEASE}"
-            USSDGW_IMAGE_VARIANT="alpine"
+        # Auto: prefer zulu if its tarball exists, else heavy
+        if [ -f "${DOCKER_TAR_ZULU}" ]; then
+            USSDGW_IMAGE_DEFAULT="${DOCKER_IMAGE_ZULU_RELEASE}"
+            USSDGW_IMAGE_VARIANT="zulu"
         else
             USSDGW_IMAGE_DEFAULT="${DOCKER_IMAGE_RELEASE}"
             USSDGW_IMAGE_VARIANT="heavy"
         fi
         ;;
-    *) echo "WARN: USSDGW_IMAGE_VARIANT='${USSDGW_IMAGE_VARIANT}' invalid (heavy|alpine|auto); defaulting to alpine"
-       USSDGW_IMAGE_DEFAULT="${DOCKER_IMAGE_ALPINE_RELEASE}"
-       USSDGW_IMAGE_VARIANT="alpine"
+    *) echo "WARN: USSDGW_IMAGE_VARIANT='${USSDGW_IMAGE_VARIANT}' invalid (heavy|zulu|auto); defaulting to zulu"
+       USSDGW_IMAGE_DEFAULT="${DOCKER_IMAGE_ZULU_RELEASE}"
+       USSDGW_IMAGE_VARIANT="zulu"
        ;;
 esac
 export USSDGW_IMAGE_VARIANT

@@ -2,7 +2,7 @@
 # Multi-stage build for sctp-m3ua-collector.
 # Result: a static musl-linked binary running as nobody on alpine.
 
-FROM rust:1.78-alpine3.19 AS builder
+FROM rust:1.85-alpine3.21 AS builder
 RUN apk add --no-cache musl-dev linux-headers pkgconfig
 WORKDIR /build
 # Pre-cache dependencies separately for faster incremental builds.

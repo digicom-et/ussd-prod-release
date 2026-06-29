@@ -170,7 +170,7 @@ Toàn bộ stack chạy qua **một `docker-compose.yml` duy nhất** ở packag
 │                                                                     │
 │  init (alpine, one-shot) → seed /opt/ussdgw                         │
 │           ↓                                                         │
-│  ussdgw (network_mode: host, alpine+openjdk8, Wildfly 10)          │
+│  ussdgw (network_mode: host, Zulu 8 JDK, Wildfly 10)          │
 │           │                                                         │
 │  collector (Rust, AF_PACKET SCTP/M3UA, host net, NET_RAW)          │
 │           ↓  HTTP /metrics @ :9090                                  │
@@ -224,10 +224,10 @@ Package dùng scheme **Hybrid SemVer + CalVer**: `<USSDGW_VERSION>+<BUILD_DATE>`
 
 ```bash
 # From artifact server:
-wget https://artifacts.digicom-et.com/ussdgw/docker/restcomm-ussd-alpine-7.3.1.tar -P docker/
+wget https://artifacts.digicom-et.com/ussdgw/docker/restcomm-ussd-zulu-7.3.1.tar -P docker/
 
 # Or build from source:
-cd ../ussdgateway/release-wildfly && ./build-docker-alpine.sh
+cd ../ussdgateway/release-wildfly && ./build-docker-zulu.sh
 ```
 
 **SemVer rules:**
@@ -235,8 +235,8 @@ cd ../ussdgateway/release-wildfly && ./build-docker-alpine.sh
 - `MINOR` (7.3.x → 7.4.0): feature mới backward-compat (thêm endpoint, thêm short code)
 - `MAJOR` (7.x → 8.0.0): breaking change (drop Wildfly, đổi port, đổi cấu trúc /opt/ussdgw)
 
-**Customer-facing Docker tag dùng SemVer** (`restcomm-ussd-alpine:7.3.1`) — stable qua nhiều rebuild.
-**Internal release-specific tag** dùng đầy đủ (`restcomm-ussd-alpine:7.3.1-20260628-3d3881a`) — phục vụ rollback và audit.
+**Customer-facing Docker tag dùng SemVer** (`restcomm-ussd-zulu:7.3.1`) — stable qua nhiều rebuild.
+**Internal release-specific tag** dùng đầy đủ (`restcomm-ussd-zulu:7.3.1-20260628-3d3881a`) — phục vụ rollback và audit.
 
 Xem version hiện tại:
 ```bash

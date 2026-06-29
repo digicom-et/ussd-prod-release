@@ -4,7 +4,7 @@ Mỗi lần tạo package mới phải **đủ 4 phần**:
 
 | Phần | Nguồn | Đích trong package |
 |------|--------|-------------------|
-| Docker image | `ussdgateway/release-wildfly` (`./build-docker.sh`) | `docker/restcomm-ussd-alpine-7.3.1.tar` |
+| Docker image | `ussdgateway/release-wildfly` (`./build-docker.sh`) | `docker/restcomm-ussd-zulu-7.3.1.tar` |
 | Gateway | `release-wildfly` compose + config-seed | `gateway/` |
 | Scripts | `ussdgw-prod-release/scripts/` (giữ trong repo/package) | `scripts/` |
 | **Test tools** | xem bảng dưới | `tools/` |
