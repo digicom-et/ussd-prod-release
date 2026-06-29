@@ -21,4 +21,11 @@
   <asynchardfailmessage>He thong dang co nhieu nguoi su dung, vui long dung lai sau</asynchardfailmessage>
   <bridgestatettlsec>180</bridgestatettlsec>
   <pushretrydelaysms>3000,8000,15000</pushretrydelaysms>
+  <!-- Per-protocol bridge enable/disable (default all true) -->
+  <httpclientbridgeenabled>true</httpclientbridgeenabled>
+  <grpcclientbridgeenabled>true</grpcclientbridgeenabled>
+  <httpserverbridgeenabled>true</httpserverbridgeenabled>
+  <grpcserverbridgeenabled>true</grpcserverbridgeenabled>
+  <!-- Channel-A sync reconcile kill-switch -->
+  <bridgesyncreconcileenabled>true</bridgesyncreconcileenabled>
 </HashMap>
