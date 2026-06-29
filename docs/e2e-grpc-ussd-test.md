@@ -1263,6 +1263,211 @@ curl -sS -X POST http://127.0.0.1:8080/restcomm \
 
 ---
 
+### 8.9 Call flow chi tiết — Adaptive timeout cho HTTP & gRPC
+
+#### 8.9.1 HTTP Pull — vòng đời adaptive gate đầy đủ
+
+Luồng dưới mô tả **toàn bộ vòng đời** của một HTTP Pull MO request dưới adaptive gate, bao gồm cả trường hợp gate co giãn theo EWMA và bridge S2.
+
+```mermaid
+sequenceDiagram
+    participant UE as User Equipment
+    participant MAP as MAP Client
+    participant SBB as ChildSbb (HTTP)
+    participant Cache as VirtualSessionStore
+    participant AS as HTTP AS :8049
+    participant Push as HttpServerSbb
+
+    Note over SBB: EWMA gate hiện tại = 3200 ms
+
+    UE->>MAP: *519#
+    MAP->>SBB: ProcessUnstructuredSSRequest
+    SBB->>SBB: Tạo correlationId + requestId
+    SBB->>Cache: put(WAIT_AS, requestId)
+    SBB->>AS: POST http://127.0.0.1:8049/
+
+    alt AS nhanh (trước gate 3200ms)
+        AS-->>SBB: HTTP 200 + menu XML (450ms)
+        Note over SBB: EWMA: gate = 2650ms
+        SBB->>Cache: remove(requestId)
+        SBB->>MAP: UnstructuredSSRequest (menu)
+        MAP->>UE: Hiển thị menu Balance
+    else AS chậm (sau gate 3200ms)
+        Note over SBB: Gate 3200ms hết hạn
+        SBB->>UE: asyncWaitUserMessage
+        SBB->>MAP: Đóng MAP dialogue S1
+        SBB->>Cache: update(BRIDGED)
+        SBB->>SBB: CDR phase=S1_RELEASED
+
+        alt Channel A — HTTP response muộn
+            AS-->>SBB: HTTP 200 + menu XML (8500ms)
+            SBB->>Push: deliverLateMenu()
+        else Channel B — AS callback
+            AS->>Push: POST /restcomm<br/>X-Ussd-Request-Id
+            Push->>Cache: get(requestId)
+        end
+        Push->>Push: CDR phase=S2_PUSH
+        Push->>MAP: UnstructuredSSRequest (NI)
+        MAP->>UE: Menu kết quả
+    end
+```
+
+**Các bước quan trọng:**
+
+| Bước | Thành phần | Hành vi |
+|------|-----------|---------|
+| 1 | `ChildSbb` | Nhận MAP request → tạo `correlationId` + `requestId` → lưu cache |
+| 2 | `ChildSbb` | POST HTTP tới AS, kèm `requestId` trong body |
+| 3a | EWMA | AS trả lời trước gate → gate **giảm** |
+| 3b | EWMA | AS trả lời sau gate → gate **tăng** (max `asyncGateTimeoutMs`) |
+| 4 | Bridge | Gate hết → release S1 → `asyncWaitUserMessage` → giữ session |
+| 5 | Reconcile | AS muộn khớp qua Channel A hoặc Channel B |
+| 6 | Push | `HttpServerSbb` push NI menu tới MSC → CDR S2 |
+
+### 8.9.2 gRPC Pull — adaptive gate với connection reuse
+
+```mermaid
+sequenceDiagram
+    participant MAP as MAP Client
+    participant SBB as ChildSbb (gRPC)
+    participant Cache as VirtualSessionStore
+    participant GW as GrpcClientSbb
+    participant AS as gRPC AS :8443
+    participant Push as HttpServerSbb
+
+    Note over GW: EWMA gate hiện tại = 1800 ms
+    MAP->>SBB: ProcessUnstructuredSSRequest *100#
+    SBB->>Cache: WAIT_AS (requestId)
+    GW->>AS: gRPC unary call
+    alt AS trả lời trước gate
+        AS-->>GW: response (120ms)
+        Note over GW: EWMA: gate = 1464ms
+        GW->>SBB: menu XML
+    else gate hết trước response
+        Note over GW: Gate 1800ms expired
+        GW->>SBB: onGateTimeout
+        SBB->>Cache: BRIDGED
+        SBB->>MAP: close S1
+        AS-->>GW: late response (9200ms)
+        GW->>Push: deliverLateMenu
+        Push->>MAP: NI push S2
+    end
+```
+
+**Điểm khác biệt gRPC vs HTTP:**
+
+| Yếu tố | HTTP Pull | gRPC Pull |
+|--------|-----------|-----------|
+| Kết nối | HTTP POST mới | gRPC stream reuse |
+| Echo requestId | HTTP body | JSON envelope |
+| Channel A | Cùng POST response | Cùng gRPC stream |
+| Channel B | POST /restcomm | HTTP fallback |
+| EWMA | Theo networkId | Cùng pool với HTTP |
+
+
+#### 8.9.3 HTTP Push — adaptive constraints
+
+Khi AS khởi tạo NI push không có Pull MO trước, không có bridge S2:
+
+```mermaid
+sequenceDiagram
+    participant AS as External AS
+    participant GW as HttpServerSbb
+    participant MAP as MAP/MSC
+    AS->>GW: POST /restcomm (không X-Ussd-Request-Id)
+    GW->>GW: Parse XmlMAPDialog + SRI
+    alt MSC sẵn sàng
+        GW->>MAP: UnstructuredSSNotify
+    else MSC bận
+        GW->>GW: Retry: 3000, 8000, 15000ms
+    end
+```
+
+| | Pull MO | Push NI lạnh | Push NI bridge S2 |
+|---|---|---|---|
+| Adaptive gate | ✅ EWMA | ❌ | ❌ |
+| Bridge S1 | ✅ nếu AS chậm | ❌ | Đã bridge |
+| Retry | Bridge | ✅ back-off | ✅ back-off |
+| CDR | S1+S2 | Đơn | S2 (chung corrId) |
+
+#### 8.9.4 Multi-turn menu dưới adaptive gate
+
+```mermaid
+sequenceDiagram
+    participant UE as Subscriber
+    participant GW as UssdGateway
+    participant AS as Application Server
+    Note over GW: EWMA gate = 5000ms
+    UE->>GW: *100#
+    GW->>AS: Pull MO turn 1
+    AS-->>GW: Menu (800ms)
+    Note over GW: gate = 4160ms
+    UE->>GW: 1 (Balance)
+    GW->>AS: Pull MO turn 2
+    AS-->>GW: So du (350ms)
+    Note over GW: gate = 3398ms
+    UE->>GW: 0 (Exit)
+    GW->>AS: Pull MO turn 3
+    AS-->>GW: End (200ms)
+    Note over GW: gate = 2758ms
+    Note over GW: 3 turn: 5000→2758ms
+```
+
+#### 8.9.5 EWMA calculation
+
+Công thức: `gate = 0.8 × old_gate + 0.2 × latency`, `min=1000, max=7000ms`.
+
+| Request | Latency | Gate trước | Gate sau | Xu hướng |
+|---------|---------|-----------|----------|----------|
+| init | — | — | 5000 | Khởi tạo |
+| 1 | 450ms | 5000 | **4090** | ↓ |
+| 2 | 320ms | 4090 | **3336** | ↓ |
+| 4 | 8900ms | 2771 | **3997** | ↑ (bridge) |
+| 50 | 150ms | 1020 | **1000** | Chạm sàn |
+
+### 8.10 Các chế độ adaptive — từng tool
+
+| Tool | Mode | Flags |
+|------|------|-------|
+| `http_as_server.py` | Normal | `--min 1 --max 100` |
+| `http_as_server.py` | Bridge | `--bridge-delay 8000 --bridge-every N` |
+| `http_as_server.py` | Mixed | `--min 1 --max 80 --bridge-delay 8000 --bridge-every 10 --workers 128` |
+| `ussd_as_server.py` | Normal | `--min 1 --max 100 --workers 128` |
+| `ussd_as_server.py` | Bridge | `--bridge-delay 8000 --bridge-every 5` |
+| `ussd_as_server.py` | Extreme | `--bridge-delay 9000 --bridge-every 1` |
+
+```bash
+# HTTP AS mixed (production test)
+.venv/bin/python http_as_server.py --port 8049 \
+  --min-delay 1 --max-delay 80 --bridge-delay 8000 --bridge-every 10 --workers 128
+
+# gRPC AS bridge mode
+.venv/bin/python ussd_as_server.py --port 8443 \
+  --bridge-delay 8000 --bridge-every 5 --workers 128
+
+# gRPC load client — adaptive gate test
+.venv/bin/python loadtest_client.py --target localhost:8443 \
+  --tps 500 --duration 120 --multi-menu --profile ADAPTIVE \
+  --think-min 50 --think-max 300
+
+# HTTP Push 1000 TPS
+.venv/bin/python http_push_loadtest.py \
+  --target http://127.0.0.1:8080/restcomm --mode multi --profile ADAPTIVE \
+  --tps 1000 --duration 300 --think-min 50 --think-max 500 --max-inflight 2000
+```
+
+### 8.11 So sánh Adaptive timeout giữa các protocol
+
+| Tiêu chí | HTTP Pull | HTTP Push | gRPC Pull | gRPC Push |
+|----------|-----------|-----------|-----------|-----------|
+| Adaptive gate EWMA | ✅ | ❌ | ✅ | ❌ |
+| Bridge S1+S2 | ✅ A+B | ❌ | ✅ A | ❌ |
+| Retry khi fail | Bridge | Back-off | Bridge | Back-off |
+| CDR pair | S1+S2 | Đơn | S1+S2 | Đơn |
+| Max TPS tested | 1000 | 1000 | 1000 | 500 |
+
+---
+
 # 9. Lỗi thường gặp
 
 | Triệu chứng | Nguyên nhân | Cách sửa |

@@ -1263,6 +1263,299 @@ curl -sS -X POST http://127.0.0.1:8080/restcomm \
 
 ---
 
+### 8.9 Detailed call flows — Adaptive timeout for HTTP & gRPC
+
+#### 8.9.1 HTTP Pull — full adaptive gate lifecycle
+
+Full lifecycle of an HTTP Pull MO request under adaptive gate with EWMA and S2 bridge.
+
+```mermaid
+sequenceDiagram
+    participant UE
+    participant MAP as MAP Client
+    participant Child as ChildSbb HTTP
+    participant Cache as VirtualSessionStore
+    participant AS as HTTP AS :8049
+    participant Push as HttpServerSbb
+
+    UE->>MAP: USSD *519#
+    MAP->>Child: ProcessUnstructuredSSRequest
+    Child->>Cache: WAIT_AS (correlationId, requestId)
+    Child->>AS: POST / XmlMAPDialog (HTTP)
+    Note over Child: EWMA calculates adaptive gate
+
+    alt AS responds before gate (fast path)
+        AS-->>Child: menu XML < gate ms
+        Child->>MAP: UnstructuredSSRequest (menu)
+        MAP->>UE: menu on device
+        Note over Cache: REMOVE_WAIT_AS
+        Note over Child: EWMA records low latency → gate decreases
+    else AS slower than gate (bridge path)
+        Note over Child: gate timer fires
+        Child->>UE: asyncWaitUserMessage via MAP
+        Child->>MAP: TC-END (close MO dialogue S1)
+        Child->>Cache: BRIDGED (state=PENDING)
+        Note over Child: CDR S1 (bridgePhase=S1_RELEASED)
+
+        alt Channel A — same HTTP POST response
+            AS-->>Child: late menu (same connection)
+            Child->>Push: reconcileLateResponse (SYNC)
+            Push->>Cache: load session by requestId
+        else Channel B — AS callback
+            AS->>Push: POST /restcomm + X-Ussd-Request-Id
+            Push->>Cache: load by requestId
+        end
+
+        Push->>MAP: UnstructuredSSNotify (NI push S2)
+        MAP->>UE: result menu
+        Note over Push: CDR S2 (same correlationId)
+        Note over Cache: EXPIRE after bridgeStateTtlSec
+    end
+```
+
+**Key steps:**
+
+| Step | Component | Behavior |
+|------|-----------|----------|
+| 1 | `ChildSbb` HTTP | Posts `XmlMAPDialog` to AS, starts adaptive gate timer |
+| 2 | EWMA | Computes `gate = 0.8 × oldGate + 0.2 × latencyMs`, clamped [1000, 7000] |
+| 3 | Fast path | AS responds before gate → deliver directly to MAP; EWMA updated |
+| 4 | Gate expiry | `asyncWaitUserMessage` sent to UE; MAP dialogue closed (S1 released) |
+| 5 | Cache | State transitions: `WAIT_AS` → `BRIDGED` (or `REMOVE_WAIT_AS` on fast path) |
+| 6 | Channel A | Same HTTP POST response arrives late; `reconcileLateResponse` sync |
+| 7 | Channel B | AS POSTs to `/restcomm` with `X-Ussd-Request-Id` header |
+| 8 | Push S2 | `HttpServerSbb` delivers menu via NI push; CDR links same `correlationId` |
+
+
+#### 8.9.2 gRPC Pull — adaptive gate with connection reuse
+
+```mermaid
+sequenceDiagram
+    participant MAP as MAP Client
+    participant Child as ChildSbb gRPC
+    participant Cache as VirtualSessionStore
+    participant Grpc as GrpcClientSbb
+    participant AS as gRPC AS :8443
+    participant Push as HttpServerSbb
+
+    MAP->>Child: ProcessUnstructuredSSRequest
+    Child->>Cache: WAIT_AS (correlationId, requestId)
+    Child->>Grpc: sendGrpcRequest (requestId in envelope)
+    Grpc->>AS: gRPC RawBytes method
+    Note over Child: EWMA adaptive gate starts
+
+    alt AS responds before gate (fast path)
+        AS-->>Grpc: response with echo requestId
+        Grpc-->>Child: GrpcResponse
+        Child->>MAP: menu response
+        Note over Cache: REMOVE_WAIT_AS
+        Note over Child: EWMA: gate converges toward AS latency
+    else Gate expired — AS still processing
+        Note over Child: gate timer fires
+        Child->>MAP: asyncWaitUserMessage
+        Child->>MAP: TC-END (S1 released)
+        Child->>Cache: BRIDGED
+        Note over Child: CDR S1 (bridgePhase=S1_RELEASED)
+
+        AS-->>Grpc: late response with requestId
+        Grpc->>Grpc: GrpcClientSbb.processGrpcResponse
+        Grpc->>Push: reconcileLateResponse (SYNC via requestId)
+        Push->>Cache: load session
+        Push->>MAP: UnstructuredSSNotify (NI push S2)
+        Note over Push: CDR S2 (same correlationId)
+    end
+```
+
+**gRPC vs HTTP differences:**
+
+| Factor | HTTP Pull | gRPC Pull |
+|--------|-----------|-----------|
+| Transport | HTTP POST to AS `:8049` | gRPC `RawBytes` to AS `:8443` |
+| Envelope | `XmlMAPDialog` in POST body | JSON envelope with `requestId` field |
+| Channel A | Same POST response stream | Same gRPC stream (`GrpcClientSbb` holds ref) |
+| Channel B | POST `/restcomm` + header `X-Ussd-Request-Id` | Not applicable (gRPC connection reused) |
+| Connection reuse | Stateless (new per request) | Persistent (multiplexed gRPC channel) |
+| Late reconcile | `HttpServerSbb.reconcileLateResponse` | `GrpcClientSbb.processGrpcResponse` → reconcile |
+| `requestId` echo | Manual (AS appends to response or header) | Automatic (AS echoes from envelope) |
+
+
+#### 8.9.3 HTTP Push — adaptive constraints without MO bridge
+
+When AS initiates NI push without prior Pull MO, there is no bridge S2 context. Gateway applies back-off retry with `pushRetryDelaysMs` when MSC is busy.
+
+```mermaid
+sequenceDiagram
+    participant AS as External AS
+    participant GW as HttpServerSbb
+    participant MAP as MAP/MSC
+    participant UE
+
+    AS->>GW: POST /restcomm (no X-Ussd-Request-Id)
+    GW->>GW: optional SRI (SriSbb)
+    GW->>MAP: UnstructuredSSNotify/Request
+
+    alt MSC ready
+        MAP->>UE: push notification delivered
+    else MSC busy / TCAP congestion
+        MAP-->>GW: error / busy
+        GW->>GW: back-off retry (pushRetryDelaysMs: 3000, 8000, 15000)
+        GW->>MAP: retry UnstructuredSSNotify
+        MAP->>UE: push delivered on retry
+    end
+```
+
+**Pull MO vs Push NI comparison:**
+
+| Criterion | Pull MO (adaptive gate) | Push NI (cold) |
+|-----------|--------------------------|----------------|
+| Trigger | Subscriber dials `*xxx#` | AS initiates outbound |
+| MAP primitive | `ProcessUnstructuredSSRequest` | `UnstructuredSSNotify` / `UnstructuredSSRequest` |
+| Bridge context | `correlationId` + `requestId` in cache | None (stateless) |
+| Adaptive gate | EWMA per network ID, 1000–7000 ms | Not applicable |
+| Retry strategy | S1 release → S2 reconcile via Channel A/B | Back-off: `pushRetryDelaysMs` (3s, 8s, 15s) |
+| CDR | Pair `S1_RELEASED` + `S2_PUSH` | Single push record |
+| `asyncWaitUserMessage` | Yes (on gate expiry) | No (no MO to release) |
+
+#### 8.9.4 Multi-turn menu under adaptive gate
+
+Subscriber navigates a multi-level menu. Each turn creates a new MAP dialogue. EWMA adjusts the gate per turn based on observed AS latency.
+
+```mermaid
+sequenceDiagram
+    participant UE as Subscriber
+    participant GW as Gateway
+    participant AS as Application Server
+
+    Note over UE,AS: Turn 1 — dial *100#
+    UE->>GW: USSD *100#
+    GW->>AS: POST MO (turn 1)
+    Note over GW: gate = 5000 ms (initial)
+    AS-->>GW: menu response (800 ms)
+    GW->>UE: "1.Balance 2.Data 3.Exit"
+    Note over GW: EWMA: gate = 0.8×5000 + 0.2×800 = 4160 ms
+
+    Note over UE,AS: Turn 2 — user sends "1"
+    UE->>GW: USSD "1"
+    GW->>AS: POST MO (turn 2)
+    Note over GW: gate = 4160 ms
+    AS-->>GW: balance response (350 ms)
+    GW->>UE: "Balance: 50.00 ETB"
+    Note over GW: EWMA: gate = 0.8×4160 + 0.2×350 = 3398 ms
+
+    Note over UE,AS: Turn 3 — user sends "2"
+    UE->>GW: USSD "2"
+    GW->>AS: POST MO (turn 3)
+    Note over GW: gate = 3398 ms
+    AS-->>GW: data response (200 ms)
+    GW->>UE: "Data: 2.5 GB remaining"
+    Note over GW: EWMA: gate = 0.8×3398 + 0.2×200 = 2758 ms
+```
+
+**Key behavior:**
+
+- Each turn is a separate MAP dialogue with its own adaptive gate
+- EWMA smooths jitter — a single slow turn does not drastically raise the gate
+- Gate floor (1000 ms) prevents premature S1 release on sub-millisecond AS responses
+- Gate ceiling (7000 ms) ensures S1 release before TCAP `dialogTimeout` (90 s)
+
+#### 8.9.5 EWMA calculation walk-through
+
+**Formula:** `gate_new = 0.8 × gate_old + 0.2 × latency_observed`
+
+**Constraints:** `min = 1000 ms`, `max = 7000 ms` (ceiling set by `asyncGateTimeoutMs`)
+
+| Request # | AS latency (ms) | Old gate (ms) | New gate (ms) | Trend |
+|-----------|-----------------|---------------|---------------|-------|
+| 1 | 800 | 5000 (seed) | 0.8×5000 + 0.2×800 = **4160** | ↓ decreasing |
+| 2 | 1200 | 4160 | 0.8×4160 + 0.2×1200 = **3568** | ↓ spike absorbed |
+| 3 | 300 | 3568 | 0.8×3568 + 0.2×300 = **2914** | ↓ fast AS |
+| 4 | 300 | 2914 | 0.8×2914 + 0.2×300 = **2391** | ↓ stabilizing |
+| 5 | 5000 | 2391 | 0.8×2391 + 0.2×5000 = **2913** | ↑ slow outlier |
+| 6 | 400 | 2913 | 0.8×2913 + 0.2×400 = **2410** | ↓ recovery |
+| 7 | 50 | 2410 | 0.8×2410 + 0.2×50 = **1938** | ↓ minimal lat |
+| 8 | 50 | 1938 | 0.8×1938 + 0.2×50 = **1560** | ↓ converging |
+| 9 | 60 | 1560 | 0.8×1560 + 0.2×60 = **1260** | ↓ near floor |
+| 10 | 50 | 1260 | 0.8×1260 + 0.2×50 = **1018** | ↓ → clamped to 1000 |
+
+**Observations:**
+
+- **Smoothing factor 0.2:** Each new latency contributes only 20% to the gate; old value retains 80%
+- **Spike at request #5:** A 5000 ms outlier raises gate from 2391 → 2913 (only +522 ms), not to 5000
+- **Recovery:** Two fast requests (#6–7) bring gate back below 2000 ms
+- **Floor clamping:** At request #10, computed 1018 → clamped to 1000 ms minimum
+- **Per-network isolation:** EWMA state is keyed by `networkId` — different operators have independent gates
+
+
+### 8.10 Adaptive timeout modes per tool
+
+| Tool | Mode | Flags | Behavior |
+|------|------|-------|----------|
+| `http_as_server.py` | **Normal** | `--min-delay 1 --max-delay 100` | Random latency 1–100 ms; feeds EWMA; gate stabilizes around 100–300 ms |
+| `http_as_server.py` | **Bridge** | `--bridge-delay 8000 --bridge-every 10` | 10% of requests delayed 8000 ms ≈ always > gate (7000) → bridge S1+S2 |
+| `http_as_server.py` | **Mixed** | `--min-delay 1 --max-delay 80 --bridge-delay 8000 --bridge-every 10` | 90% fast (feeds EWMA), 10% bridge (exercises S1→S2 recovery) |
+| `ussd_as_server.py` | **Normal** | `--min-delay 1 --max-delay 100` | Same as HTTP — random latency feeds EWMA adaptive gate |
+| `ussd_as_server.py` | **Bridge** | `--bridge-delay 8000 --bridge-every N` | Every Nth request triggers bridge S1+S2 via gRPC stream |
+| `ussd_as_server.py` | **Extreme** | `--bridge-delay 8000 --bridge-every 1` | **Every** response delayed → pure bridge test; EWMA still records |
+
+**Normal mode (random latency feeds EWMA):**
+
+```bash
+# HTTP Pull
+python3 http_as_server.py --port 8049 --min-delay 1 --max-delay 100
+
+# gRPC Pull
+.venv/bin/python ussd_as_server.py --port 8443 --min-delay 1 --max-delay 100
+```
+
+**Bridge mode (forced S1+S2 for N% of requests):**
+
+```bash
+# HTTP Pull — 10% bridge
+python3 http_as_server.py --port 8049 --bridge-delay 8000 --bridge-every 10
+
+# gRPC Pull — every request bridges
+.venv/bin/python ussd_as_server.py --port 8443 --bridge-delay 8000 --bridge-every 1
+```
+
+**Mixed mode (production-like simulation):**
+
+```bash
+# HTTP Pull — 90% fast + 10% bridge
+python3 http_as_server.py --port 8049 \
+  --min-delay 1 --max-delay 80 \
+  --bridge-delay 8000 --bridge-every 10
+
+# gRPC Pull — same mix
+.venv/bin/python ussd_as_server.py --port 8443 \
+  --min-delay 1 --max-delay 80 \
+  --bridge-delay 8000 --bridge-every 10 \
+  --workers 128
+```
+
+### 8.11 Adaptive timeout comparison across protocols
+
+| Criteria | HTTP Pull | HTTP Push | gRPC Pull | gRPC Push |
+|----------|-----------|-----------|-----------|-----------|
+| **Adaptive gate** | Yes — EWMA per `networkId` | No (stateless NI) | Yes — EWMA per `networkId` | No (stateless NI) |
+| **Gate range** | 1000–7000 ms | N/A | 1000–7000 ms | N/A |
+| **Bridge S1** | Yes — `ChildSbb` HTTP releases MAP dialog | No (no MO context) | Yes — `ChildSbb` gRPC releases MAP dialog | No (no MO context) |
+| **Bridge S2** | Channel A (same POST) or Channel B (`POST /restcomm`) | Back-off retry (`pushRetryDelaysMs`) | Channel A only (gRPC stream reuse) | Back-off retry via gRPC push ingress |
+| **`asyncWaitUserMessage`** | Yes — on gate expiry | No | Yes — on gate expiry | No |
+| **EWMA recording** | On every MO response latency | Not applicable | On every MO response latency | Not applicable |
+| **CDR bridge pair** | `S1_RELEASED` + `S2_PUSH` (same `correlationId`) | Single push record | `S1_RELEASED` + `S2_PUSH` (same `correlationId`) | Single push record |
+| **Retry strategy** | S2 reconcile via Channel A/B with TTL | Back-off: 3s, 8s, 15s | S2 reconcile via gRPC stream with TTL | Back-off: 3s, 8s, 15s |
+| **Session TTL** | `bridgeStateTtlSec` (180 s) | N/A | `bridgeStateTtlSec` (180 s) | N/A |
+| **AS tool** | `http_as_server.py` | `http_push_loadtest.py` | `ussd_as_server.py` | `grpc_push_client.py` |
+| **Primary use** | Subscriber-initiated USSD menus | AS-initiated notifications | Subscriber-initiated USSD menus | AS-initiated notifications via gRPC |
+
+**Protocol selection guide:**
+
+- **HTTP Pull** — Use when AS is HTTP-based and supports `X-Ussd-Request-Id` for Channel B recovery
+- **gRPC Pull** — Use when AS is gRPC-based; Channel A only (stream reuse), lower latency, connection multiplexing
+- **HTTP Push** — Use for AS-initiated notifications (balance alerts, campaign push); no MO bridge context
+- **gRPC Push** — Use for AS-initiated notifications over gRPC ingress; same back-off behavior as HTTP Push
+
+
 # 9. Common errors
 
 | Symptom | Cause | Fix |

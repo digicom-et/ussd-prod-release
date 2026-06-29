@@ -2,6 +2,7 @@
 # Docker image tarballs (700–900 MB each) — download from artifact server:
 #   wget https://artifacts.digicom-et.com/ussdgw/docker/restcomm-ussd-alpine-7.3.1.tar
 docker/*.tar
+gateway/restcomm-ussd-*.zip
 docker/*.tar.bak
 backups/ussdgw-*/ussdgw-host.tgz
 backups/*.tgz

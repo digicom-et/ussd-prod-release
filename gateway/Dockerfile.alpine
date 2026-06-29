@@ -46,7 +46,7 @@ ENV USSD_VERSION=${USSD_VERSION} \
 #  ca-certificates         — HTTPS/TLS for curl, mgmt API, jSS7 stack
 #  tzdata                  — TZ env (TZ=Asia/Ho_Chi_Minh) needs zoneinfo
 #  lksctp-tools            — libsctp.so + userspace tools for SCTP (jSS7)
-#  inetutils-scripts       — `hostname -s` (used by docker-entrypoint.sh)
+#  hostname                 — available via busybox (Alpine default)
 #  nano, vim               — ops convenience (config edit inside container)
 #  procps                  — `ps`, `top` for ops
 #  iproute2                — `ss`, `ip` for ops
@@ -60,7 +60,6 @@ RUN apk add --no-cache \
         ca-certificates \
         tzdata \
         lksctp-tools \
-        inetutils-scripts \
         nano \
         vim \
         procps \
