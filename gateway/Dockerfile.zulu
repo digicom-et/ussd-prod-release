@@ -58,6 +58,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN groupadd -g 2000 ussdgw \
  && useradd -u 2000 -g ussdgw -d /opt/restcomm -s /sbin/nologin ussdgw
 
+# ---- Cache bust (bump to force rebuild from COPY onwards) --------------------
+ARG CACHEBUST=1
+
 # ---- Working dir & release payload ------------------------------------------
 WORKDIR /opt/restcomm
 
