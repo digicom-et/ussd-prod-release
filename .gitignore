@@ -28,3 +28,12 @@ bpf-tps-monitor/*/target/
 docker-compose.*.bak
 gateway/docker-compose.*.bak
 bpf-tps-monitor/docker-compose.*.bak
+
+# Build resources (large files — download separately)
+resources/wildfly-*.zip
+
+# Gateway build artifacts (temporary)
+gateway/restcomm-ussd-*-linux.zip
+
+# Build projects directory (cloned by build-all.sh)
+../build-projects/
