@@ -311,3 +311,195 @@ SKIP_DOCKER=1 ./build-all.sh
 Docker፣ JDK 8፣ Python 3.9+፣ SCTP (`lsmod | grep sctp`)፣ RAM ≥ 6 GB።
 BPF ሰብሳቢ/TUI `NET_RAW` ችሎታ (capability) ያስፈልገዋል (በcompose ውስጥ አስቀድሞ ተካቷል)።
 
+
+
+---
+
+## 🔬 ምርምር (Research)
+
+የUSSD Gateway ፕሮዳክሽን ጥቅል የሚከተሉትን የምርምር ክፍሎች ያካትታል።
+(The USSD Gateway production package includes the following research components.)
+
+### 1. BPF/eBPF SCTP/M3UA TPS መቆጣጠሪያ (Monitor) — 2 Rust Tools
+
+የSCTP/M3UA ሲግናሊንግ ፕሌን ላይ የእውነተኛ ጊዜ ፓኬት መቆጣጠሪያ ሲስተም። በRust የተጻፉ 2 መሣሪያዎችን ያካትታል።
+
+| መሣሪያ (Tool) | ቋንቋ (Lang) | ሚና (Role) | ቴክኖሎጂ (Tech) |
+|---|---|---|---|
+| **collector** | Rust | Headless BPF ሰብሳቢ — የSGW ኢንተርፌስ ላይ ፓኬቶችን ይቆጣጠራል፣ SCTP/M3UA ፓኬቶችን በሰከንድ ይቆጥራል፣ በM3UA መልእክት ክፍል ይመድባል፣ JSON በ `:9090/metrics` ያቀርባል | AF_PACKET/BPF, Rust, CAP_NET_RAW + SYS_ADMIN |
+| **tui** | Rust | በይነተገናኝ ተርሚናል ዳሽቦርድ — ሰብሳቢውን በየሰከንዱ ይጠይቃል፣ በቦታው ላይ የሚቀረጽ (flicker-free) ሙሉ ስክሪን ያሳያል | ratatui + crossterm, Rust |
+
+**የቁልፍ ሰሌዳ ቁልፎች (Key bindings):**
+- `q` / `Esc` — መውጫ (Quit)
+- `p` — ለአፍታ ማቆም/መቀጠል (Pause/Resume)
+- `r` — ታሪክ ዳግም ማስጀመር (Reset 60s sparkline history)
+
+**ቦታ (Location):** `bpf-tps-monitor/` — `collector/` + `tui/` ንዑስ ማውጫዎች ያሉት
+**መገንባት (Build):** `cargo build --release --target x86_64-unknown-linux-musl` → የማይንቀሳቀስ ባይነሪ ~3-5 MB
+
+### 2. Mastra AI Multi-Agent QA ቡድን (Team)
+
+በAI የተደገፈ ራስ-ሰር የሙከራ ስርዓት። Mastra ፍሬምወርክ በመጠቀም ብዙ AI ወኪሎችን ያስተባብራል።
+
+| ክፍል (Component) | ብዛት (Count) | መግለጫ (Description) |
+|---|---|---|
+| **Agents** | 3 | Orchestrator (አስተባባሪ)፣ Code Analyzer (ኮድ ተንታኝ)፣ Test Executor (ሙከራ አስፈጻሚ) |
+| **Workflows** | 2 | test-pipeline (TRIGGER→ANALYZE→EXECUTE→EVALUATE)፣ scenario-runner (S0-S10 ደረጃ በደረጃ በtmux መስኮቶች) |
+| **Tools** | 7 | map-runner፣ http-runner፣ grpc-runner፣ docker-manager፣ tmux-session-manager፣ pcap-capture፣ pcap-utils |
+
+- **ቦታ (Location):** `ussd-qa-team/mastra/`
+- **ፍሬምወርክ (Framework):** Mastra v1.17 + @mastra/core v1.48
+- **ሞዴል (Model):** GPT-4o (OpenAI)
+- **ስቱዲዮ (Studio):** Web UI በ `http://localhost:4111`
+
+### 3. Virtual Session Bridge — ምናባዊ ክፍለ-ጊዜ ድልድይ
+
+የUSSD Gateway ዋና ባህሪ — ቀርፋፋ የመተግበሪያ አገልጋይ (AS) ምላሽ በሚዘገይበት ጊዜ የMAP ውይይት መረጋጋትን ይጠብቃል።
+
+| ዘዴ (Mechanism) | ዓላማ (Purpose) |
+|---|---|
+| **Adaptive Gate (EWMA)** | በየ `networkId` አማካይ የAS መዘግየት → ተለዋዋጭ በር በ `[1000 ms, 7000 ms]` ክልል ውስጥ |
+| **Virtual Session Bridge** | በሩ ሲያልፍ S1 MAP ውይይትን ይለቃል፣ ምናባዊ ክፍለ-ጊዜ በመሸጎጫ ያስቀምጣል፣ ውጤቱን በNI push S2 ያቀርባል |
+| **Unified Reconciliation** | Channel A (ተመሳሳይ gRPC/HTTP ግንኙነት) ወይም Channel B (`POST /restcomm` + `X-Ussd-Request-Id`) በኩል የዘገየ AS ምላሽን ያዛምዳል |
+| **Bridge TTL** | 180 ሰከንድ የመሸጎጫ ቆይታ — AS ለመመለስ ያለው መስኮት |
+
+**የጊዜ ገደብ ተዋረድ (Timeout hierarchy):**
+```
+1000 ms ≤ adaptiveGate ≤ 7000 ms (asyncGateTimeoutMs) < 60000 ms (dialogTimeout) < 90000 ms (TCAP)
+```
+
+ዝርዝር ዲዛይን፡ [`docs/design/virtual-session-bridge.md`](docs/design/virtual-session-bridge.md)
+
+
+
+---
+
+## 🚀 እንዴት ማስኪደት (How to Run)
+
+### ፈጣን ጅምር (Quick Start) — አንድ አገልጋይ፣ Docker
+
+```bash
+cd /opt/ussdgw-prod-release
+sudo modprobe sctp
+chmod +x scripts/*.sh
+
+# 1. አካባቢ አረጋግጥ (Verify environment)
+./scripts/00-preflight.sh
+
+# 2. Docker ምስል ጫን (Load image)
+./scripts/01-load-docker-image.sh
+
+# 3. አስተናጋጅ አዋቅር (Setup host)
+sudo ./scripts/02-setup-host.sh
+
+# 4. ጌትዌይ አስነሳ (Start gateway)
+./scripts/03-start-gateway.sh
+curl -fs http://localhost:8080/jolokia/version && echo " OK"
+```
+
+### E2E gRPC ሙከራ (E2E gRPC Test)
+
+```bash
+# Terminal 1: ጌትዌይ + gRPC AS
+./scripts/03-start-gateway.sh
+./scripts/05-start-grpc-as.sh
+
+# Terminal 2: MAP ማጨስ ሙከራ (10 ውይይቶች *100#)
+./scripts/06-run-map-smoke.sh
+
+# Terminal 3: gRPC በቀጥታ ሙከራ
+./scripts/07-run-grpc-smoke.sh
+
+# ሁሉንም አቁም (Stop all)
+./scripts/stop-all.sh
+```
+
+### ከBPF መቆጣጠሪያ ጋር (With BPF Monitor)
+
+```bash
+# ጌትዌይ + ሰብሳቢ እንደ daemon፣ TUI ከፊት (foreground)
+docker compose -f docker-compose.yml up -d ussdgw collector
+docker compose -f docker-compose.yml up tui
+
+# ወይም ስክሪፕቶችን ተጠቀም (Or use scripts):
+./scripts/03-start-gateway.sh --with-monitor    # ጌትዌይ + ሰብሳቢ
+./scripts/03-start-gateway.sh --tui-only        # TUI ዳሽቦርድ አያይዝ
+```
+
+### ከMastra AI QA ጋር (With Mastra AI QA)
+
+```bash
+cd ussd-qa-team/mastra
+export NVM_DIR="$HOME/.config/nvm" && . "$NVM_DIR/nvm.sh"
+
+# ጥገኛዎችን ጫን (Install dependencies)
+npm install
+
+# የአካባቢ ተለዋዋጮችን አዋቅር (Configure env)
+# .env ፋይል አርትዕ: OPENAI_API_KEY=sk-..., USSDGW_MAP_LIB=/opt/ussdgw-prod-release/tools/jss7-map-load/lib, ...
+
+# Mastra Studio አስነሳ (Start Studio)
+npx mastra dev
+# → Web UI በ http://localhost:4111 ይከፈታል
+
+# የሙከራ ፓይፕላይን አስኪድ (Run test pipeline)
+# በStudio Web UI ወይም በAPI:
+curl -X POST http://localhost:4111/api/workflows/test-pipeline/start \
+  -H "Content-Type: application/json" \
+  -d '{"inputData": {"trigger": "manual", "message": "E2E smoke test"}}'
+
+# Scenario runner — ደረጃ በደረጃ በtmux መስኮቶች (per-step in tmux windows)
+curl -X POST http://localhost:4111/api/workflows/scenario-runner/start \
+  -H "Content-Type: application/json" \
+  -d '{"inputData": {"scenarios": ["S0","S1","S2","S3","S4","S5"], "pcap": true}}'
+
+# የtmux መስኮቶችን ተመልከት (View tmux windows)
+tmux attach -t ussd-e2e-test
+# Ctrl-b 0-9 → በመስኮቶች መካከል መቀያየር (switch between windows)
+# Ctrl-b d  → መለየት (detach)
+```
+
+### ሙሉ ላብ (Full Lab) — ሁሉም መሣሪያዎች በtmux
+
+```bash
+# Terminal 1: ጌትዌይ + ሰብሳቢ
+cd /opt/ussdgw-prod-release
+./scripts/03-start-gateway.sh --with-monitor
+
+# Terminal 2: BPF TUI ዳሽቦርድ
+docker compose -f docker-compose.yml up tui
+
+# Terminal 3: gRPC AS
+./scripts/05-start-grpc-as.sh
+tail -f grpc-as.log
+
+# Terminal 4: MAP ማጨስ ሙከራ
+./scripts/06-run-map-smoke.sh
+
+# Terminal 5: gRPC ሙከራ
+./scripts/07-run-grpc-smoke.sh
+
+# Terminal 6: HTTP Pull + Push
+./scripts/09-start-http-as.sh
+./scripts/12-run-http-pull-smoke.sh
+./scripts/13-run-http-push-smoke.sh
+
+# ወይም Mastra scenario-runner ተጠቀም — ሁሉንም በራስ-ሰር በtmux መስኮቶች ያስኪዳል
+# (Or use Mastra scenario-runner — auto-spawns all in tmux windows)
+npx mastra run scenario-runner --scenarios S0,S1,S2,S3,S4,S5,S6,S7,S8,S9,S10 --pcap
+```
+
+### የፓኬት ቀረጻ (PCAP Capture) በሙከራ ጊዜ
+
+```bash
+# ከMastra tool በኩል (Via Mastra tool)
+# scenario-runner ሲጀምር --pcap ባንዲራ ሲሰጠው በራስ-ሰር tcpdump ያስነሳና ያቆማል
+
+# በእጅ (Manual):
+sudo tcpdump -i any -s 0 -w /tmp/ussd-e2e.pcap proto 132 &
+# ... ሙከራዎችን አስኪድ (run tests) ...
+sudo pkill tcpdump
+capinfos /tmp/ussd-e2e.pcap
+wireshark /tmp/ussd-e2e.pcap &
+```
+

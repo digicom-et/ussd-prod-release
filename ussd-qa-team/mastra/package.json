@@ -1,0 +1,27 @@
+{
+  "name": "ussd-qa-team",
+  "version": "0.1.0",
+  "description": "USSD Gateway AI-powered QA Testing Team",
+  "type": "module",
+  "scripts": {
+    "dev": "mastra dev",
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "keywords": ["ussd", "qa", "ai-agents", "mastra"],
+  "author": "Huu Nhan Tran",
+  "license": "ISC",
+  "dependencies": {
+    "@mastra/core": "^1.48.0",
+    "dotenv": "^17.4.2",
+    "mastra": "^1.17.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "@types/node": "^22.0.0"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}
