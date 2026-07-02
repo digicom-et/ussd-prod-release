@@ -1,8 +1,8 @@
 import { createStep, createWorkflow } from "@mastra/core/workflows";
 import { z } from "zod";
 import { execSync } from "child_process";
+import { PKG_ROOT } from "../config";
 
-const PKG_ROOT = process.env.PKG_ROOT || "/opt/ussdgw-prod-release";
 const SESSION = "ussd-e2e-test";
 
 function run(cmd: string, timeoutMs = 30000): string {

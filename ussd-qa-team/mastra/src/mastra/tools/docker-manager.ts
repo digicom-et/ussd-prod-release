@@ -1,6 +1,7 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 import { execSync } from "child_process";
+import { PKG_ROOT } from "../config";
 
 export const dockerManager = createTool({
   id: "docker-manager",
@@ -16,7 +17,7 @@ export const dockerManager = createTool({
     stderr: z.string(),
   }),
   execute: async ({ context }) => {
-    const composePath = context.composePath || process.env.USSDGW_GATEWAY_COMPOSE || "/opt/ussdgw-test/gateway";
+    const composePath = context.composePath || process.env.USSDGW_GATEWAY_COMPOSE || `${PKG_ROOT}/gateway`;
     const svc = context.service ? ` ${context.service}` : "";
     let cmd = "";
     switch (context.action) {

@@ -1,6 +1,7 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 import { execSync } from "child_process";
+import { PKG_ROOT } from "../config";
 
 export const grpcRunner = createTool({
   id: "grpc-runner",
@@ -16,7 +17,7 @@ export const grpcRunner = createTool({
     exitCode: z.number(),
   }),
   execute: async ({ context }) => {
-    const script = context.scriptPath || process.env.USSDGW_GRPC_SCRIPT || "/opt/ussdgw-test/scripts/05-start-grpc-as.sh";
+    const script = context.scriptPath || process.env.USSDGW_GRPC_SCRIPT || `${PKG_ROOT}/scripts/05-start-grpc-as.sh`;
     try {
       const stdout = execSync(`bash ${script}`, { timeout: 30000, encoding: "utf-8" });
       return { success: true, stdout, stderr: "", exitCode: 0 };

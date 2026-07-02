@@ -1,6 +1,7 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 import { execSync } from "child_process";
+import { PKG_ROOT } from "../config";
 
 /**
  * MAP-level load test runner
@@ -34,7 +35,7 @@ export const mapRunner = createTool({
   }),
   execute: async ({ context }) => {
     const { hostIp, peerIp, peerPort, totalDialogs, maxConcurrent, ussdString, tps, durationSec, libPath } = context;
-    const lib = libPath || process.env.USSDGW_MAP_LIB || "/opt/ussdgw-test/map-level/lib";
+    const lib = libPath || process.env.USSDGW_MAP_LIB || `${PKG_ROOT}/tools/jss7-map-load/lib`;
 
     const cmd = [
       `java -cp "${lib}/*"`,

@@ -52,9 +52,9 @@ fi
 echo "--- recent container log (last 40 lines) ---"
 docker logs --tail 40 "${C}" 2>&1 || true
 
-if [ -f /opt/ussdgw/log/server.log ]; then
-    echo "--- /opt/ussdgw/log/server.log (last 20 lines) ---"
-    tail -20 /opt/ussdgw/log/server.log
+if [ -f "${HOST_USSDGW}/log/server.log" ]; then
+    echo "--- ${HOST_USSDGW}/log/server.log (last 20 lines) ---"
+    tail -20 "${HOST_USSDGW}/log/server.log"
     echo "--- known error patterns in server.log ---"
     for pat in \
         'UnknownHostException: ussd-prod' \
@@ -63,7 +63,7 @@ if [ -f /opt/ussdgw/log/server.log ]; then
         'HttpServletResourceEntryPoint' \
         'failed to connect to MAP service' \
         'compute-jvm.sh.*e+'; do
-        if grep -qE "${pat}" /opt/ussdgw/log/server.log 2>/dev/null; then
+        if grep -qE "${pat}" "${HOST_USSDGW}/log/server.log" 2>/dev/null; then
             echo "  FOUND: ${pat} — see docs/e2e-grpc-ussd-test.md troubleshooting table"
         fi
     done

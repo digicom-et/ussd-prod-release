@@ -436,7 +436,7 @@ export NVM_DIR="$HOME/.config/nvm" && . "$NVM_DIR/nvm.sh"
 npm install
 
 # የአካባቢ ተለዋዋጮችን አዋቅር (Configure env)
-# .env ፋይል አርትዕ: OPENAI_API_KEY=sk-..., USSDGW_MAP_LIB=/opt/ussdgw-prod-release/tools/jss7-map-load/lib, ...
+# .env ፋይል አርትዕ: OPENAI_API_KEY=sk-... (PKG_ROOT auto-detected, tool paths optional)
 
 # Mastra Studio አስነሳ (Start Studio)
 npx mastra dev

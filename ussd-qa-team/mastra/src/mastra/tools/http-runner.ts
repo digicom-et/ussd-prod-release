@@ -1,6 +1,7 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 import { execSync } from "child_process";
+import { PKG_ROOT } from "../config";
 
 /** HTTP-level load test runner */
 export const httpRunner = createTool({
@@ -22,7 +23,7 @@ export const httpRunner = createTool({
   }),
   execute: async ({ context }) => {
     const { baseUrl, targetTps, workerThreads, maxConcurrent, durationSec, ussdString } = context;
-    const jar = process.env.USSDGW_HTTP_JAR || "/opt/ussdgw-test/http-level/lib/loadtest.jar";
+    const jar = process.env.USSDGW_HTTP_JAR || `${PKG_ROOT}/http-level/lib/loadtest.jar`;
     const cmd = `java -Xms2g -Xmx2g -cp "${jar}" org.mobicents.ussd.loadtest.UssdHttpLoadGenerator ${baseUrl} ${targetTps} ${workerThreads} ${maxConcurrent} ${durationSec} "${ussdString}"`;
     try {
       const stdout = execSync(cmd, { timeout: (durationSec + 30) * 1000, encoding: "utf-8", maxBuffer: 10 * 1024 * 1024 });
